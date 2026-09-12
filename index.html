@@ -54,7 +54,7 @@
     <script>
         // URL se amount aur order_id padhne ke liye code
         const urlParams = new URLSearchParams(window.location.search);
-        const amountRupees = urlParams.get('amount') || '100'; // Default amount agar na mile
+        const amountRupees = urlParams.get('amount') || '100';
         const orderId = urlParams.get('order_id') || 'ORD_' + Math.floor(Math.random() * 100000);
 
         // Screen par dikhane ke liye
@@ -63,17 +63,16 @@
 
         function startPayment() {
             var options = {
-                "key": "rzp_test_TX6xmGCiQa00Yg", // Aapki Test Key
+                "key": "rzp_test_TX6xmGCiQa00Yg", // Aapki Test Key (Live karni ho toh yahan rzp_live_... daal dein)
                 "amount": amountRupees * 100, // Razorpay paise me leta hai
                 "currency": "INR",
                 "name": "Manormart",
                 "description": "Order Payment",
                 "handler": function (response){
-                    // Payment successful hone par ye block chalega
+                    // Payment successful hone par ye block chalega aur success parameters ke sath redirect karega
                     alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
                     
-                    // App ko wapas redirect karne ke liye custom scheme
-                    window.location.href = "manormart://payment-success?payment_id=" + response.razorpay_payment_id + "&order_id=" + orderId;
+                    window.location.href = "https://shabaj9769-alt.github.io/manormart-pay/?payment=success&payment_id=" + response.razorpay_payment_id + "&order_id=" + orderId;
                 },
                 "prefill": {
                     "name": urlParams.get('name') || "Customer",
