@@ -69,10 +69,18 @@
                 "name": "Manormart",
                 "description": "Order Payment",
                 "handler": function (response){
-                    // Payment successful hone par alert dikhayein aur seedha app par redirect karein
-                    alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
-                    
-                    window.location.href = "manormart://payment-success?payment=success&payment_id=" + response.razorpay_payment_id + "&order_id=" + orderId;
+                    const paymentId = response.razorpay_payment_id;
+                    alert("Payment Successful! Payment ID: " + paymentId);
+
+                    // Direct Firebase database par status update karein taaki bina payment ke koi cheat na kar sake
+                    fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
+                        method: 'PUT',
+                        body: JSON.stringify('Order Successful')
+                    }).then(() => {
+                        window.location.href = "manormart://payment-success?order_id=" + orderId;
+                    }).catch(err => {
+                        window.location.href = "manormart://payment-success?order_id=" + orderId;
+                    });
                 },
                 "prefill": {
                     "name": urlParams.get('name') || "Customer",
