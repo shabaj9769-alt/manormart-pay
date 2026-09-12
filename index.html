@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manormart Secure Payment</title>
+    <!-- Razorpay Checkout Script -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h2 { color: #333; }
+        p { color: #666; font-size: 16px; }
+        .amount { font-size: 24px; font-weight: bold; color: #28a745; margin: 15px 0; }
+        button {
+            background-color: #3399cc;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 15px;
+        }
+        button:hover { background-color: #2382b0; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Manormart Checkout</h2>
+        <p>Order ID: <span id="display-order-id">Loading...</span></p>
+        <div class="amount">₹<span id="display-amount">0.00</span></div>
+        <button id="pay-btn" onclick="startPayment()">Pay Now</button>
+    </div>
+
+    <script>
+        // URL se amount aur order_id padhne ke liye code
+        const urlParams = new URLSearchParams(window.location.search);
+        const amountRupees = urlParams.get('amount') || '100'; // Default amount agar na mile
+        const orderId = urlParams.get('order_id') || 'ORD_' + Math.floor(Math.random() * 100000);
+
+        // Screen par dikhane ke liye
+        document.getElementById('display-order-id').innerText = orderId;
+        document.getElementById('display-amount').innerText = amountRupees;
+
+        function startPayment() {
+            var options = {
+                "key": "rzp_test_TX6xmGCiQa00Yg", // Aapki Test Key yahan dal di gayi hai
+                "amount": amountRupees * 100, // Razorpay paise me leta hai
+                "currency": "INR",
+                "name": "Manormart",
+                "description": "Order Payment",
+                "handler": function (response){
+                    // Payment successful hone par ye block chalega
+                    alert("Payment Successful! Payment ID: " + response.razorpay_payment_id);
+                    
+                    // App ko wapas redirect karne ke liye custom scheme
+                    window.location.href = "manormart://payment-success?payment_id=" + response.razorpay_payment_id + "&order_id=" + orderId;
+                },
+                "prefill": {
+                    "name": urlParams.get('name') || "Customer",
+                    "email": urlParams.get('email') || "customer@example.com",
+                    "contact": urlParams.get('phone') || "9999999999"
+                },
+                "theme": {
+                    "color": "#3399cc"
+                }
+            };
+            var rzp1 = new Razorpay(options);
+            rzp1.open();
+        }
+    </script>
+</body>
+</html>
