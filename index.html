@@ -52,27 +52,28 @@
     </div>
 
     <script>
-        // URL se amount aur order_id padhne ke liye code
         const urlParams = new URLSearchParams(window.location.search);
         const amountRupees = urlParams.get('amount') || '100';
         const orderId = urlParams.get('order_id') || 'ORD_' + Math.floor(Math.random() * 100000);
 
-        // Screen par dikhane ke liye
         document.getElementById('display-order-id').innerText = orderId;
         document.getElementById('display-amount').innerText = amountRupees;
 
+        let paymentCompleted = false;
+
         function startPayment() {
             var options = {
-                "key": "rzp_test_TX6xmGCiQa00Yg", // Aapki Test Key
-                "amount": amountRupees * 100, // Razorpay paise me leta hai
+                "key": "rzp_test_TX6xmGCiQa00Yg",
+                "amount": amountRupees * 100,
                 "currency": "INR",
                 "name": "Manormart",
                 "description": "Order Payment",
                 "handler": function (response){
+                    paymentCompleted = true;
                     const paymentId = response.razorpay_payment_id;
                     alert("Payment Successful! Payment ID: " + paymentId);
 
-                    // Direct Firebase database par status update karein taaki bina payment ke koi cheat na kar sake
+                    // Successful hone par order successful status update karein
                     fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
                         method: 'PUT',
                         body: JSON.stringify('Order Successful')
@@ -81,6 +82,19 @@
                     }).catch(err => {
                         window.location.href = "manormart://payment-success?order_id=" + orderId;
                     });
+                },
+                "modal": {
+                    "ondismiss": function() {
+                        // Agar user ne payment popup beech me hi kat diya ya fail ho gaya
+                        if (!paymentCompleted) {
+                            fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
+                                method: 'PUT',
+                                body: JSON.stringify('❌ Payment Failed / Cancelled')
+                            }).then(() => {
+                                window.location.href = "manormart://payment-failed?order_id=" + orderId;
+                            });
+                        }
+                    }
                 },
                 "prefill": {
                     "name": urlParams.get('name') || "Customer",
