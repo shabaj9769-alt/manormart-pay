@@ -61,10 +61,13 @@
             color: #2e7d32;
             border: 1px solid #c8e6c9;
         }
-        .return-btn {
+        .fail-box {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+        .action-btn {
             display: inline-block;
-            background-color: #2e7d32;
-            color: white;
             text-decoration: none;
             padding: 12px 20px;
             font-size: 15px;
@@ -72,7 +75,12 @@
             border-radius: 8px;
             margin-top: 10px;
             width: 90%;
+            cursor: pointer;
+            border: none;
         }
+        .btn-success { background-color: #2e7d32; color: white; }
+        .btn-retry { background-color: #e65100; color: white; }
+        .btn-cancel { background-color: #757575; color: white; margin-top: 8px; font-size: 13px; }
         .category { font-weight: bold; color: #1b5e20; margin-top: 12px; border-bottom: 2px solid #c8e6c9; padding-bottom: 4px; font-size: 13px; }
         .product-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #eee; color: #444; }
     </style>
@@ -92,39 +100,30 @@
     <!-- Store Catalog -->
     <div class="store-section">
         <h3 style="color: #1b5e20; font-size: 15px; margin-top: 0; text-align: center;">🛒 Manor Mart Live Catalog</h3>
-        
         <div class="category">🥕 Fresh Vegetables & Bhaji</div>
         <div class="product-row"><span>Fresh Tamatar (Tomato - 1 kg)</span> <span>₹40</span></div>
         <div class="product-row"><span>Pyaz (Onion - 1 kg)</span> <span>₹35</span></div>
         <div class="product-row"><span>Aloo (Potato - 1 kg)</span> <span>₹30</span></div>
-        <div class="product-row"><span>Hari Mirch & Lehsun (250g)</span> <span>₹25</span></div>
-        <div class="product-row"><span>Green Palak / Bhaji (1 Bundle)</span> <span>₹15</span></div>
-
         <div class="category">🥛 Milk & Dairy Products</div>
         <div class="product-row"><span>Fresh Cow Milk (1 Liter)</span> <span>₹32</span></div>
         <div class="product-row"><span>Amul Butter / Curd (500g)</span> <span>₹70</span></div>
         <div class="product-row"><span>Paneer (200g)</span> <span>₹90</span></div>
-
-        <div class="category">🍚 Groceries & Staples</div>
-        <div class="product-row"><span>Kolam Rice (1 kg)</span> <span>₹60</span></div>
-        <div class="product-row"><span>Toor Dal (1 kg)</span> <span>₹120</span></div>
-        <div class="product-row"><span>Sugar (1 kg)</span> <span>₹45</span></div>
-        <div class="product-row"><span>Cooking Oil (1 Liter)</span> <span>₹130</span></div>
     </div>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const amountRupees = urlParams.get('amount') || '100';
-        const orderId = urlParams.get('order_id') || 'ord_' + Date.now();
+        const amountRupees = urlParams.get('amount') || '10';
+        const orderId = urlParams.get('order_id') || '';
 
-        document.getElementById('display-order-id').innerText = orderId;
+        document.getElementById('display-order-id').innerText = orderId ? ('#' + orderId.slice(-6)) : 'ORD-MANOR';
         document.getElementById('display-amount').innerText = amountRupees;
 
         let paymentProcessed = false;
 
         async function syncFirebaseStatus(statusText) {
+            if (!orderId) return;
             try {
-                await fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
+                await fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + encodeURIComponent(orderId) + "/deliveryStatus.json", {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(statusText)
@@ -143,16 +142,34 @@
                 <div>✅ Payment Successful!</div>
                 <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
                 <div style="font-size: 12px; margin-top: 8px; color: #333;">Order Placed Successfully!</div>
-                <a href="manormart://orders" class="return-btn">🔙 Open Manor Mart App</a>
+                <a href="manormart://orders" class="action-btn btn-success">🔙 Open Manor Mart App</a>
             `;
+            setTimeout(() => { window.location.href = "manormart://orders"; }, 1200);
+        }
 
-            // Try direct scheme return automatically
-            setTimeout(() => {
-                window.location.href = "manormart://orders";
-            }, 1200);
+        function showFailureUI() {
+            document.getElementById('pay-btn').style.display = 'none';
+            const statusDiv = document.getElementById('status-container');
+            statusDiv.className = 'status-box fail-box';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `
+                <div>❌ Payment Incomplete / Cancelled</div>
+                <div style="font-size: 11px; margin-top: 4px; color: #666;">Aapka payment poora nahi hua tha.</div>
+                <button onclick="startPayment()" class="action-btn btn-retry">🔄 Retry Payment (Dobara Koshish Karein)</button>
+                <button onclick="cancelAndReturn()" class="action-btn btn-cancel">🔙 App Par Wapas Jayein</button>
+            `;
+        }
+
+        async function cancelAndReturn() {
+            await syncFirebaseStatus('❌ Payment Failed / Cancelled');
+            window.location.href = "manormart://orders";
         }
 
         function startPayment() {
+            const statusDiv = document.getElementById('status-container');
+            statusDiv.style.display = 'none';
+            document.getElementById('pay-btn').style.display = 'block';
+
             var options = {
                 "key": "rzp_live_TbUQsW8HqKfMkm",
                 "amount": Math.round(Number(amountRupees) * 100),
@@ -161,20 +178,13 @@
                 "description": "Order " + orderId,
                 "handler": async function (response) {
                     paymentProcessed = true;
-                    // First ensure Firebase gets updated immediately
                     await syncFirebaseStatus('Order Successful');
                     showSuccessUI(response.razorpay_payment_id);
                 },
                 "modal": {
-                    "ondismiss": async function() {
+                    "ondismiss": function() {
                         if (!paymentProcessed) {
-                            await syncFirebaseStatus('❌ Payment Failed / Cancelled');
-                            const statusDiv = document.getElementById('status-container');
-                            statusDiv.className = 'status-box';
-                            statusDiv.style.display = 'block';
-                            statusDiv.style.backgroundColor = '#ffebee';
-                            statusDiv.style.color = '#c62828';
-                            statusDiv.innerHTML = '❌ Payment Cancelled. Please try again.';
+                            showFailureUI();
                         }
                     }
                 },
@@ -189,12 +199,14 @@
             };
 
             var rzp1 = new Razorpay(options);
+            rzp1.on('payment.failed', function (response){
+                showFailureUI();
+            });
             rzp1.open();
         }
 
-        // Auto trigger payment popup on load
         window.addEventListener('load', () => {
-            setTimeout(startPayment, 600);
+            setTimeout(startPayment, 500);
         });
     </script>
 </body>
