@@ -3,31 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manormart Secure Payment</title>
+    <title>Manormart Secure Payment & Store</title>
     <!-- Razorpay Checkout Script -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f9;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         .card {
             background: white;
-            padding: 30px;
+            padding: 25px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             text-align: center;
-            max-width: 400px;
+            max-width: 450px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .store-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-width: 450px;
             width: 100%;
         }
-        h2 { color: #333; }
-        p { color: #666; font-size: 16px; }
-        .amount { font-size: 24px; font-weight: bold; color: #28a745; margin: 15px 0; }
+        h2 { color: #333; margin-top: 0; }
+        p { color: #666; font-size: 15px; }
+        .amount { font-size: 22px; font-weight: bold; color: #28a745; margin: 10px 0; }
         button {
             background-color: #3399cc;
             color: white;
@@ -37,18 +46,49 @@
             border-radius: 6px;
             cursor: pointer;
             width: 100%;
-            margin-top: 15px;
+            margin-top: 10px;
         }
         button:hover { background-color: #2382b0; }
+        .category { font-weight: bold; color: #1b5e20; margin-top: 12px; border-bottom: 2px solid #c8e6c9; padding-bottom: 4px; font-size: 14px; }
+        .product-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #eee; color: #444; }
     </style>
 </head>
 <body>
 
+    <!-- Checkout Card -->
     <div class="card">
         <h2>Manormart Checkout</h2>
         <p>Order ID: <span id="display-order-id">Loading...</span></p>
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         <button id="pay-btn" onclick="startPayment()">Pay Now</button>
+    </div>
+
+    <!-- Store Catalog (Comprehensive List for Verification) -->
+    <div class="store-section">
+        <h3 style="color: #1b5e20; font-size: 16px; margin-top: 0; text-align: center;">🛒 Manor Mart Complete Store Catalog</h3>
+        
+        <div class="category">🥕 Fresh Vegetables & Bhaji</div>
+        <div class="product-row"><span>Fresh Tamatar (Tomato - 1 kg)</span> <span>₹40</span></div>
+        <div class="product-row"><span>Pyaz (Onion - 1 kg)</span> <span>₹35</span></div>
+        <div class="product-row"><span>Aloo (Potato - 1 kg)</span> <span>₹30</span></div>
+        <div class="product-row"><span>Hari Mirch & Lehsun (250g)</span> <span>₹25</span></div>
+        <div class="product-row"><span>Green Palak / Bhaji (1 Bundle)</span> <span>₹15</span></div>
+
+        <div class="category">🥛 Milk & Dairy Products</div>
+        <div class="product-row"><span>Fresh Cow Milk (1 Liter)</span> <span>₹32</span></div>
+        <div class="product-row"><span>Amul Butter / Curd (500g)</span> <span>₹70</span></div>
+        <div class="product-row"><span>Paneer (200g)</span> <span>₹90</span></div>
+
+        <div class="category">🍚 Groceries & Staples</div>
+        <div class="product-row"><span>Kolam Rice (1 kg)</span> <span>₹60</span></div>
+        <div class="product-row"><span>Toor Dal (1 kg)</span> <span>₹120</span></div>
+        <div class="product-row"><span>Sugar (1 kg)</span> <span>₹45</span></div>
+        <div class="product-row"><span>Cooking Oil (1 Liter)</span> <span>₹130</span></div>
+
+        <div class="category">🍪 Snacks & Beverages</div>
+        <div class="product-row"><span>Parle-G / Biscuits (Pack)</span> <span>₹10</span></div>
+        <div class="product-row"><span>Chai Patti (Tea Powder - 250g)</span> <span>₹110</span></div>
+        <div class="product-row"><span>Namkeen / Snacks (Pack)</span> <span>₹40</span></div>
     </div>
 
     <script>
@@ -73,7 +113,6 @@
                     const paymentId = response.razorpay_payment_id;
                     alert("Payment Successful! Payment ID: " + paymentId);
 
-                    // Successful hone par order successful status update karein
                     fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
                         method: 'PUT',
                         body: JSON.stringify('Order Successful')
@@ -85,7 +124,6 @@
                 },
                 "modal": {
                     "ondismiss": function() {
-                        // Agar user ne payment popup beech me hi kat diya ya fail ho gaya
                         if (!paymentCompleted) {
                             fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
                                 method: 'PUT',
