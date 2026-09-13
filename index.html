@@ -3,69 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manormart Secure Payment & Store</title>
-    <!-- Razorpay Checkout Script -->
+    <title>Manormart Secure Payment</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f9;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
         .card {
             background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 450px;
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        .store-section {
-            background: white;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            max-width: 450px;
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .store-section {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-width: 420px;
             width: 100%;
         }
-        h2 { color: #333; margin-top: 0; }
-        p { color: #666; font-size: 15px; }
-        .amount { font-size: 22px; font-weight: bold; color: #28a745; margin: 10px 0; }
-        button {
-            background-color: #3399cc;
+        h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
+        .amount { font-size: 26px; font-weight: bold; color: #2e7d32; margin: 10px 0; }
+        .btn-pay {
+            background-color: #6a1b9a;
             color: white;
             border: none;
-            padding: 12px 20px;
+            padding: 14px 20px;
             font-size: 16px;
-            border-radius: 6px;
+            font-weight: bold;
+            border-radius: 8px;
             cursor: pointer;
             width: 100%;
             margin-top: 10px;
         }
-        button:hover { background-color: #2382b0; }
-        .category { font-weight: bold; color: #1b5e20; margin-top: 12px; border-bottom: 2px solid #c8e6c9; padding-bottom: 4px; font-size: 14px; }
-        .product-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #eee; color: #444; }
+        .btn-pay:hover { background-color: #4a148c; }
+        .status-box {
+            display: none;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .success-box {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .return-btn {
+            display: inline-block;
+            background-color: #2e7d32;
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-top: 10px;
+            width: 90%;
+        }
+        .category { font-weight: bold; color: #1b5e20; margin-top: 12px; border-bottom: 2px solid #c8e6c9; padding-bottom: 4px; font-size: 13px; }
+        .product-row { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #eee; color: #444; }
     </style>
 </head>
 <body>
 
-    <!-- Checkout Card -->
     <div class="card">
-        <h2>Manormart Checkout</h2>
-        <p>Order ID: <span id="display-order-id">Loading...</span></p>
+        <h2>🛒 Manor Mart Payment</h2>
+        <p style="color: #666; font-size: 13px; margin: 4px 0;">Order ID: <b id="display-order-id">Loading...</b></p>
         <div class="amount">₹<span id="display-amount">0.00</span></div>
-        <button id="pay-btn" onclick="startPayment()">Pay Now</button>
+        
+        <button id="pay-btn" class="btn-pay" onclick="startPayment()">Proceed to Pay</button>
+
+        <div id="status-container" class="status-box"></div>
     </div>
 
-    <!-- Store Catalog (Comprehensive List for Verification) -->
+    <!-- Store Catalog -->
     <div class="store-section">
-        <h3 style="color: #1b5e20; font-size: 16px; margin-top: 0; text-align: center;">🛒 Manor Mart Complete Store Catalog</h3>
+        <h3 style="color: #1b5e20; font-size: 15px; margin-top: 0; text-align: center;">🛒 Manor Mart Live Catalog</h3>
         
         <div class="category">🥕 Fresh Vegetables & Bhaji</div>
         <div class="product-row"><span>Fresh Tamatar (Tomato - 1 kg)</span> <span>₹40</span></div>
@@ -84,68 +110,92 @@
         <div class="product-row"><span>Toor Dal (1 kg)</span> <span>₹120</span></div>
         <div class="product-row"><span>Sugar (1 kg)</span> <span>₹45</span></div>
         <div class="product-row"><span>Cooking Oil (1 Liter)</span> <span>₹130</span></div>
-
-        <div class="category">🍪 Snacks & Beverages</div>
-        <div class="product-row"><span>Parle-G / Biscuits (Pack)</span> <span>₹10</span></div>
-        <div class="product-row"><span>Chai Patti (Tea Powder - 250g)</span> <span>₹110</span></div>
-        <div class="product-row"><span>Namkeen / Snacks (Pack)</span> <span>₹40</span></div>
     </div>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const amountRupees = urlParams.get('amount') || '100';
-        const orderId = urlParams.get('order_id') || 'ORD_' + Math.floor(Math.random() * 100000);
+        const orderId = urlParams.get('order_id') || 'ord_' + Date.now();
 
         document.getElementById('display-order-id').innerText = orderId;
         document.getElementById('display-amount').innerText = amountRupees;
 
-        let paymentCompleted = false;
+        let paymentProcessed = false;
+
+        async function syncFirebaseStatus(statusText) {
+            try {
+                await fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(statusText)
+                });
+            } catch (err) {
+                console.error("Firebase sync error:", err);
+            }
+        }
+
+        function showSuccessUI(paymentId) {
+            document.getElementById('pay-btn').style.display = 'none';
+            const statusDiv = document.getElementById('status-container');
+            statusDiv.className = 'status-box success-box';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `
+                <div>✅ Payment Successful!</div>
+                <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
+                <div style="font-size: 12px; margin-top: 8px; color: #333;">Order Placed Successfully!</div>
+                <a href="manormart://orders" class="return-btn">🔙 Open Manor Mart App</a>
+            `;
+
+            // Try direct scheme return automatically
+            setTimeout(() => {
+                window.location.href = "manormart://orders";
+            }, 1200);
+        }
 
         function startPayment() {
             var options = {
                 "key": "rzp_live_TbUQsW8HqKfMkm",
-                "amount": amountRupees * 100,
+                "amount": Math.round(Number(amountRupees) * 100),
                 "currency": "INR",
                 "name": "Manormart",
-                "description": "Order Payment",
-                "handler": function (response){
-                    paymentCompleted = true;
-                    const paymentId = response.razorpay_payment_id;
-                    alert("Payment Successful! Payment ID: " + paymentId);
-
-                    fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
-                        method: 'PUT',
-                        body: JSON.stringify('Order Successful')
-                    }).then(() => {
-                        window.location.href = "manormart://payment-success?order_id=" + orderId;
-                    }).catch(err => {
-                        window.location.href = "manormart://payment-success?order_id=" + orderId;
-                    });
+                "description": "Order " + orderId,
+                "handler": async function (response) {
+                    paymentProcessed = true;
+                    // First ensure Firebase gets updated immediately
+                    await syncFirebaseStatus('Order Successful');
+                    showSuccessUI(response.razorpay_payment_id);
                 },
                 "modal": {
-                    "ondismiss": function() {
-                        if (!paymentCompleted) {
-                            fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + orderId + "/deliveryStatus.json", {
-                                method: 'PUT',
-                                body: JSON.stringify('❌ Payment Failed / Cancelled')
-                            }).then(() => {
-                                window.location.href = "manormart://payment-failed?order_id=" + orderId;
-                            });
+                    "ondismiss": async function() {
+                        if (!paymentProcessed) {
+                            await syncFirebaseStatus('❌ Payment Failed / Cancelled');
+                            const statusDiv = document.getElementById('status-container');
+                            statusDiv.className = 'status-box';
+                            statusDiv.style.display = 'block';
+                            statusDiv.style.backgroundColor = '#ffebee';
+                            statusDiv.style.color = '#c62828';
+                            statusDiv.innerHTML = '❌ Payment Cancelled. Please try again.';
                         }
                     }
                 },
                 "prefill": {
                     "name": urlParams.get('name') || "Customer",
-                    "email": urlParams.get('email') || "customer@example.com",
-                    "contact": urlParams.get('phone') || "9999999999"
+                    "email": urlParams.get('email') || "customer@manormart.in",
+                    "contact": urlParams.get('phone') || ""
                 },
                 "theme": {
-                    "color": "#3399cc"
+                    "color": "#4a148c"
                 }
             };
+
             var rzp1 = new Razorpay(options);
             rzp1.open();
         }
+
+        // Auto trigger payment popup on load
+        window.addEventListener('load', () => {
+            setTimeout(startPayment, 600);
+        });
     </script>
 </body>
 </html>
