@@ -89,7 +89,7 @@
 
     <div class="card">
         <h2>🛒 Manor Mart Payment</h2>
-        <p style="color: #666; font-size: 13px; margin: 4px 0;">Order ID: <b id="display-order-id">Loading...</b></p>
+        <p style="color: #666; font-size: 13px; margin: 4px 0;">Order: <b id="display-order-id">Loading...</b></p>
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         
         <button id="pay-btn" class="btn-pay" onclick="startPayment()">Proceed to Pay</button>
@@ -111,19 +111,55 @@
     </div>
 
     <script>
+        const dbUrl = "https://manorbiryani-default-rtdb.firebaseio.com/orders";
         const urlParams = new URLSearchParams(window.location.search);
+        
         const amountRupees = urlParams.get('amount') || '10';
-        const orderId = urlParams.get('order_id') || '';
+        let orderId = urlParams.get('order_id') || urlParams.get('orderId') || '';
 
-        document.getElementById('display-order-id').innerText = orderId ? ('#' + orderId.slice(-6)) : 'ORD-MANOR';
         document.getElementById('display-amount').innerText = amountRupees;
+
+        // Auto find latest pending order if orderId is missing from URL
+        async function detectOrderId() {
+            if (orderId) {
+                document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+                return;
+            }
+            try {
+                const res = await fetch(dbUrl + ".json");
+                const data = await res.json();
+                if (data) {
+                    const keys = Object.keys(data);
+                    // Dhoondo sabse aakhri pending order
+                    for (let i = keys.length - 1; i >= 0; i--) {
+                        let k = keys[i];
+                        if (data[k] && data[k].deliveryStatus && data[k].deliveryStatus.includes('Payment Pending')) {
+                            orderId = k;
+                            document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+                            break;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Auto detect failed", e);
+            }
+            if (!orderId) {
+                document.getElementById('display-order-id').innerText = 'Online Order';
+            }
+        }
+        detectOrderId();
 
         let paymentProcessed = false;
 
         async function syncFirebaseStatus(statusText) {
+            // Agar orderId abhi bhi nahi hai, dobara latest pending dhoondein
+            if (!orderId) {
+                await detectOrderId();
+            }
             if (!orderId) return;
+
             try {
-                await fetch("https://manorbiryani-default-rtdb.firebaseio.com/orders/" + encodeURIComponent(orderId) + "/deliveryStatus.json", {
+                await fetch(dbUrl + "/" + orderId + "/deliveryStatus.json", {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(statusText)
@@ -175,7 +211,7 @@
                 "amount": Math.round(Number(amountRupees) * 100),
                 "currency": "INR",
                 "name": "Manormart",
-                "description": "Order " + orderId,
+                "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
                 "handler": async function (response) {
                     paymentProcessed = true;
                     await syncFirebaseStatus('Order Successful');
@@ -206,7 +242,7 @@
         }
 
         window.addEventListener('load', () => {
-            setTimeout(startPayment, 500);
+            setTimeout(startPayment, 600);
         });
     </script>
 </body>
