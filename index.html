@@ -1,3 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manor Mart - Quick Grocery Delivery</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .store-section {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            max-width: 420px;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
+        .amount { font-size: 26px; font-weight: bold; color: #2e7d32; margin: 10px 0; }
+        .btn-pay {
+            background-color: #6a1b9a;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-pay:hover { background-color: #4a148c; }
+        .status-box {
+            display: none;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .success-box {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .fail-box {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+        .action-btn {
+            display: inline-block;
+            text-decoration: none;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-top: 10px;
+            width: 90%;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-success { background-color: #2e7d32; color: white; }
+        .btn-retry { background-color: #e65100; color: white; }
+        .category { 
+            font-weight: bold; 
+            color: #1b5e20; 
+            margin-top: 14px; 
+            border-bottom: 2px solid #c8e6c9; 
+            padding-bottom: 4px; 
+            font-size: 13px; 
+        }
+        .product-row { 
+            display: flex; 
+            justify-content: space-between; 
+            font-size: 12px; 
+            padding: 6px 0; 
+            border-bottom: 1px solid #eee; 
+            color: #444; 
+        }
+        .footer-policy {
+            max-width: 420px;
+            width: 100%;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            font-size: 11px;
+            color: #666;
+            text-align: center;
+            line-height: 1.6;
+        }
+        .footer-policy a {
+            color: #4a148c;
+            text-decoration: none;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>🛒 Manor Mart Payment</h2>
+        <p style="color: #666; font-size: 13px; margin: 4px 0;">Order: <b id="display-order-id">Loading...</b></p>
+        <div class="amount">₹<span id="display-amount">0.00</span></div>
+        
+        <button id="pay-btn" class="btn-pay" onclick="startPayment()">Proceed to Pay</button>
+
+        <div id="status-container" class="status-box"></div>
+    </div>
+
+    <!-- Store Catalog with Full Categories (For Razorpay Compliance) -->
+    <div class="store-section">
+        <h3 style="color: #1b5e20; font-size: 15px; margin-top: 0; text-align: center;">🛒 Manor Mart Live Catalog</h3>
+        
+        <div class="category">🥕 Fresh Vegetables & Bhaji</div>
+        <div class="product-row"><span>Fresh Tamatar (Tomato - 1 kg)</span> <span>₹40</span></div>
+        <div class="product-row"><span>Pyaz (Onion - 1 kg)</span> <span>₹35</span></div>
+        <div class="product-row"><span>Aloo (Potato - 1 kg)</span> <span>₹30</span></div>
+        <div class="product-row"><span>Hari Mirchi & Nimbu Combo</span> <span>₹20</span></div>
+
+        <div class="category">🥛 Milk, Bread & Daily Dairy</div>
+        <div class="product-row"><span>Fresh Cow Milk (1 Liter)</span> <span>₹32</span></div>
+        <div class="product-row"><span>Amul Butter / Curd (500g)</span> <span>₹70</span></div>
+        <div class="product-row"><span>Paneer Fresh (200g)</span> <span>₹90</span></div>
+        <div class="product-row"><span>Sandwich Bread (Large)</span> <span>₹45</span></div>
+
+        <div class="category">🌾 Grocery Staples (Atta, Dal & Rice)</div>
+        <div class="product-row"><span>Aashirvaad Shudh Chakki Atta (5 kg)</span> <span>₹230</span></div>
+        <div class="product-row"><span>Toor Dal Premium (1 kg)</span> <span>₹160</span></div>
+        <div class="product-row"><span>Basmati Rice Tukda (1 kg)</span> <span>₹85</span></div>
+        <div class="product-row"><span>Tata Salt Vacuum Evaporated (1 kg)</span> <span>₹28</span></div>
+
+        <div class="category">☕ Tea, Biscuits & Snacks</div>
+        <div class="product-row"><span>Wagh Bakri Premium Tea (250g)</span> <span>₹140</span></div>
+        <div class="product-row"><span>Parle-G Gold Biscuit (Family Pack)</span> <span>₹30</span></div>
+        <div class="product-row"><span>Maggi 2-Minute Noodles (4 Pack)</span> <span>₹56</span></div>
+    </div>
+
+    <!-- Razorpay Mandatory Business & Policy Info -->
+    <div class="footer-policy">
+        <p style="font-weight: bold; margin-bottom: 5px; color: #333;">Manor Mart Retail & Quick Deliveries</p>
+        <p>Location: Manor, Palghar, Maharashtra - 401403</p>
+        <p>Support: +91 9021838873 | support@manormart.in</p>
+        <div style="margin-top: 8px;">
+            <a href="#">Privacy Policy</a> | 
+            <a href="#">Terms of Service</a> | 
+            <a href="#">Refund & Return Policy</a>
+        </div>
+        <p style="margin-top: 8px; font-size: 10px; color: #999;">Deliveries fulfilled within selected shift or Express (60 mins).</p>
+    </div>
+
     <script>
         const dbUrl = "https://manorbiryani-default-rtdb.firebaseio.com/orders";
         const urlParams = new URLSearchParams(window.location.search);
@@ -29,12 +200,14 @@
             } catch (e) {
                 console.error("Auto detect failed", e);
             }
+            if (!orderId) {
+                document.getElementById('display-order-id').innerText = 'Online Order';
+            }
             return orderId;
         }
 
         let paymentProcessed = false;
 
-        // Guaranteed background update function
         async function markOrderSuccessfulInFirebase(paymentId) {
             if (!orderId) {
                 await detectOrderId();
@@ -44,7 +217,6 @@
             const endpoint = dbUrl + "/" + orderId + "/deliveryStatus.json";
             
             try {
-                // keepalive: true ensures request completes even if user closes tab
                 const res = await fetch(endpoint, {
                     method: 'PUT',
                     keepalive: true,
@@ -66,7 +238,7 @@
             statusDiv.innerHTML = `
                 <div>✅ Payment Successful!</div>
                 <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
-                <div style="font-size: 12px; margin-top: 8px; color: #333;">Order Placed Successfully in Store!</div>
+                <div style="font-size: 13px; margin-top: 8px; color: #1b5e20;">Order Placed Successfully!</div>
                 <a href="manormart://orders" class="action-btn btn-success">🔙 Open Manor Mart App</a>
             `;
         }
@@ -100,14 +272,8 @@
                 "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
                 "handler": async function (response) {
                     paymentProcessed = true;
-                    
-                    // 1. Instantly update Firebase database before touching any redirect
                     await markOrderSuccessfulInFirebase(response.razorpay_payment_id);
-                    
-                    // 2. Render confirmation screen
                     showSuccessUI(response.razorpay_payment_id);
-
-                    // 3. User app par wapas aaye ya tab close kar de, Firebase update pehle hi execute ho chuka hai
                 },
                 "modal": {
                     "ondismiss": function() {
@@ -138,3 +304,5 @@
             setTimeout(startPayment, 300);
         });
     </script>
+</body>
+</html>
