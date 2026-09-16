@@ -165,7 +165,7 @@
             <a href="policy.html">Terms of Service</a> | 
             <a href="policy.html">Refund & Return Policy</a>
         </div>
-        <p style="margin-top: 8px; font-size: 10px; color: #999;">Deliveries fulfilled within selected shift or Express (60 mins)[span_1](start_span)[span_1](end_span).</p>
+        <p style="margin-top: 8px; font-size: 10px; color: #999;">Deliveries fulfilled within selected shift or Express (60 mins)[span_0](start_span)[span_0](end_span).</p>
     </div>
 
     <script>
@@ -176,14 +176,43 @@
         let orderId = urlParams.get('order_id') || urlParams.get('orderId') || '';
 
         document.getElementById('display-amount').innerText = amountRupees;
-        if (orderId) {
-            document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+
+        async function detectOrderId() {
+            if (orderId) {
+                document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+                return orderId;
+            }
+            try {
+                const res = await fetch(dbUrl + ".json");
+                const data = await res.json();
+                if (data) {
+                    const keys = Object.keys(data);
+                    for (let i = keys.length - 1; i >= 0; i--) {
+                        let k = keys[i];
+                        if (data[k] && data[k].deliveryStatus && data[k].deliveryStatus.includes('Payment Pending')) {
+                            orderId = k;
+                            document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+                            return orderId;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Auto detect failed", e);
+            }
+            if (!orderId) {
+                document.getElementById('display-order-id').innerText = 'Online Order';
+            }
+            return orderId;
         }
 
         let paymentProcessed = false;
 
         async function markOrderSuccessfulInFirebase(paymentId) {
+            if (!orderId) {
+                await detectOrderId();
+            }
             if (!orderId) return false;
+
             const endpoint = dbUrl + "/" + orderId + ".json";
             
             try {
@@ -229,7 +258,11 @@
             `;
         }
 
-        function startPayment() {
+        async function startPayment() {
+            if (!orderId) {
+                await detectOrderId();
+            }
+
             const parsedAmount = Math.round(Number(amountRupees) * 100);
             if (!parsedAmount || parsedAmount <= 0) {
                 alert("Invalid amount!");
@@ -274,7 +307,8 @@
             rzp1.open();
         }
 
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
+            await detectOrderId();
             setTimeout(startPayment, 400);
         });
     </script>
