@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manor Mart - Secure Checkout & Catalog</title>
+    <title>Manor Mart - Secure Checkout</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         body {
@@ -21,15 +21,6 @@
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             text-align: center;
-            max-width: 420px;
-            width: 100%;
-            margin-bottom: 15px;
-        }
-        .store-section {
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             max-width: 420px;
             width: 100%;
             margin-bottom: 15px;
@@ -56,63 +47,24 @@
             font-size: 14px;
             font-weight: bold;
         }
-        .success-box {
-            background-color: #e8f5e9;
-            color: #2e7d32;
-            border: 1px solid #c8e6c9;
-        }
-        .fail-box {
-            background-color: #ffebee;
-            color: #c62828;
-            border: 1px solid #ef9a9a;
-        }
+        .success-box { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .fail-box { background-color: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
         .action-btn {
             display: inline-block;
             text-decoration: none;
             padding: 12px 20px;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: bold;
             border-radius: 8px;
-            margin-top: 10px;
+            margin-top: 8px;
             width: 90%;
             cursor: pointer;
             border: none;
+            text-align: center;
         }
         .btn-success { background-color: #2e7d32; color: white; }
         .btn-retry { background-color: #e65100; color: white; }
-        .category { 
-            font-weight: bold; 
-            color: #1b5e20; 
-            margin-top: 14px; 
-            border-bottom: 2px solid #c8e6c9; 
-            padding-bottom: 4px; 
-            font-size: 13px; 
-        }
-        .product-row { 
-            display: flex; 
-            justify-content: space-between; 
-            font-size: 12px; 
-            padding: 6px 0; 
-            border-bottom: 1px solid #eee; 
-            color: #444; 
-        }
-        .footer-policy {
-            max-width: 420px;
-            width: 100%;
-            background: white;
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            font-size: 11px;
-            color: #666;
-            text-align: center;
-            line-height: 1.6;
-        }
-        .footer-policy a {
-            color: #4a148c;
-            text-decoration: none;
-            margin: 0 5px;
-        }
+        .btn-return { background-color: #4a148c; color: white; }
     </style>
 </head>
 <body>
@@ -123,49 +75,7 @@
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         
         <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Pay via UPI / Cards / NetBanking</button>
-
         <div id="status-container" class="status-box"></div>
-    </div>
-
-    <!-- Live Store Catalog & Categories (Mandatory for Razorpay Compliance) -->
-    <div class="store-section">
-        <h3 style="color: #1b5e20; font-size: 15px; margin-top: 0; text-align: center;">🛒 Manor Mart Live Catalog</h3>
-        
-        <div class="category">🥕 Fresh Vegetables & Bhaji</div>
-        <div class="product-row"><span>Fresh Tamatar (Tomato - 1 kg)</span> <span>₹40</span></div>
-        <div class="product-row"><span>Pyaz (Onion - 1 kg)</span> <span>₹35</span></div>
-        <div class="product-row"><span>Aloo (Potato - 1 kg)</span> <span>₹30</span></div>
-        <div class="product-row"><span>Hari Mirchi & Nimbu Combo</span> <span>₹20</span></div>
-
-        <div class="category">🥛 Milk, Bread & Daily Dairy</div>
-        <div class="product-row"><span>Amul Taaza Toned Milk (500 ml)</span> <span>₹27</span></div>
-        <div class="product-row"><span>Amul Butter (Pasteurized - 100g)</span> <span>₹60</span></div>
-        <div class="product-row"><span>Fresh Paneer (Malai Paneer - 200g)</span> <span>₹95</span></div>
-        <div class="product-row"><span>Fresh White Sliced Bread (400g)</span> <span>₹45</span></div>
-
-        <div class="category">🌾 Grocery Staples & Dry Fruits</div>
-        <div class="product-row"><span>Aashirvaad Shuddh Chakki Atta (5 kg)</span> <span>₹260</span></div>
-        <div class="product-row"><span>Premium Kaju (Cashew - 250g)</span> <span>₹220</span></div>
-        <div class="product-row"><span>Premium Badam (Almonds - 250g)</span> <span>₹180</span></div>
-        <div class="product-row"><span>Tata Salt (Iodized - 1 kg)</span> <span>₹28</span></div>
-
-        <div class="category">☕ Tea, Biscuits & Snacks</div>
-        <div class="product-row"><span>Tata Tea Gold (250g)</span> <span>₹160</span></div>
-        <div class="product-row"><span>Parle-G Glucose Biscuits (250g)</span> <span>₹30</span></div>
-        <div class="product-row"><span>Maggi 2-Minute Masala Noodles</span> <span>₹14</span></div>
-    </div>
-
-    <!-- Razorpay Mandatory Business & Policy Info -->
-    <div class="footer-policy">
-        <p style="font-weight: bold; margin-bottom: 5px; color: #333;">Manor Mart Retail & Quick Deliveries</p>
-        <p>Location: Manor, Palghar, Maharashtra - 401403</p>
-        <p>Support: +91 9021838873 | support@manormart.in</p>
-        <div style="margin-top: 8px;">
-            <a href="policy.html">Privacy Policy</a> | 
-            <a href="policy.html">Terms of Service</a> | 
-            <a href="policy.html">Refund & Return Policy</a>
-        </div>
-        <p style="margin-top: 8px; font-size: 10px; color: #999;">Deliveries fulfilled within selected shift or Express (60 mins)[span_0](start_span)[span_0](end_span).</p>
     </div>
 
     <script>
@@ -176,58 +86,20 @@
         let orderId = urlParams.get('order_id') || urlParams.get('orderId') || '';
 
         document.getElementById('display-amount').innerText = amountRupees;
-
-        async function detectOrderId() {
-            if (orderId) {
-                document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
-                return orderId;
-            }
-            try {
-                const res = await fetch(dbUrl + ".json");
-                const data = await res.json();
-                if (data) {
-                    const keys = Object.keys(data);
-                    for (let i = keys.length - 1; i >= 0; i--) {
-                        let k = keys[i];
-                        if (data[k] && data[k].deliveryStatus && data[k].deliveryStatus.includes('Payment Pending')) {
-                            orderId = k;
-                            document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
-                            return orderId;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error("Auto detect failed", e);
-            }
-            if (!orderId) {
-                document.getElementById('display-order-id').innerText = 'Online Order';
-            }
-            return orderId;
-        }
+        if (orderId) document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
 
         let paymentProcessed = false;
 
         async function markOrderSuccessfulInFirebase(paymentId) {
-            if (!orderId) {
-                await detectOrderId();
-            }
             if (!orderId) return false;
-
-            const endpoint = dbUrl + "/" + orderId + ".json";
-            
             try {
-                const res = await fetch(endpoint, {
+                const res = await fetch(dbUrl + "/" + orderId + ".json", {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        deliveryStatus: 'Order Successful',
-                        razorpayPaymentId: paymentId
-                    })
+                    body: JSON.stringify({ deliveryStatus: 'Order Successful', razorpayPaymentId: paymentId })
                 });
                 return res.ok;
-            } catch (err) {
-                return false;
-            }
+            } catch (err) { return false; }
         }
 
         function showSuccessUI(paymentId) {
@@ -241,9 +113,7 @@
                 <div style="font-size: 13px; margin-top: 8px; color: #1b5e20;">Order Confirmed! Returning to app...</div>
                 <a href="manormart://" class="action-btn btn-success">🔙 Open Manor Mart App Now</a>
             `;
-            setTimeout(() => {
-                window.location.href = "manormart://";
-            }, 1500);
+            setTimeout(() => { window.location.href = "manormart://"; }, 1500);
         }
 
         function showFailureUI() {
@@ -255,24 +125,12 @@
                 <div>❌ Payment Cancelled / Incomplete</div>
                 <div style="font-size: 11px; margin-top: 4px; color: #666;">Aapka payment poora nahi hua.</div>
                 <button onclick="startPayment()" class="action-btn btn-retry">🔄 Retry Payment</button>
+                <a href="manormart://" class="action-btn btn-return">🔙 Return to App</a>
             `;
         }
 
-        async function startPayment() {
-            if (!orderId) {
-                await detectOrderId();
-            }
-
+        function startPayment() {
             const parsedAmount = Math.round(Number(amountRupees) * 100);
-            if (!parsedAmount || parsedAmount <= 0) {
-                alert("Invalid amount!");
-                return;
-            }
-
-            const statusDiv = document.getElementById('status-container');
-            statusDiv.style.display = 'none';
-            document.getElementById('pay-btn').style.display = 'block';
-
             var options = {
                 "key": "rzp_live_TbUQsW8HqKfMkm",
                 "amount": parsedAmount,
@@ -285,32 +143,16 @@
                     showSuccessUI(response.razorpay_payment_id);
                 },
                 "modal": {
-                    "ondismiss": function() {
-                        if (!paymentProcessed) {
-                            showFailureUI();
-                        }
-                    }
+                    "ondismiss": function() { if (!paymentProcessed) showFailureUI(); }
                 },
-                "prefill": {
-                    "contact": "",
-                    "email": "shabaj9769@gmail.com"
-                },
-                "theme": {
-                    "color": "#4a148c"
-                }
+                "theme": { "color": "#4a148c" }
             };
-
             var rzp1 = new Razorpay(options);
-            rzp1.on('payment.failed', function (response){
-                showFailureUI();
-            });
+            rzp1.on('payment.failed', function (response) { showFailureUI(); });
             rzp1.open();
         }
 
-        window.addEventListener('load', async () => {
-            await detectOrderId();
-            setTimeout(startPayment, 400);
-        });
+        window.addEventListener('load', () => { setTimeout(startPayment, 400); });
     </script>
 </body>
 </html>
