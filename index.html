@@ -107,13 +107,18 @@
             const statusDiv = document.getElementById('status-container');
             statusDiv.className = 'status-box success-box';
             statusDiv.style.display = 'block';
+            
+            const redirectUrl = `manormart://success?status=success&razorpay_payment_id=${paymentId}&order_id=${orderId}`;
+
             statusDiv.innerHTML = `
                 <div>✅ Payment Successful!</div>
                 <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
                 <div style="font-size: 13px; margin-top: 8px; color: #1b5e20;">Order Confirmed! Returning to app...</div>
-                <a href="manormart://" class="action-btn btn-success">🔙 Open Manor Mart App Now</a>
+                <a href="${redirectUrl}" class="action-btn btn-success">🔙 Open Manor Mart App Now</a>
             `;
-            setTimeout(() => { window.location.href = "manormart://"; }, 1500);
+            setTimeout(() => { 
+                window.location.href = redirectUrl; 
+            }, 1200);
         }
 
         function showFailureUI() {
