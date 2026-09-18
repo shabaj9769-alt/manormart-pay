@@ -1,44 +1,204 @@
-var options = {
-    "key": "rzp_live_TbUQsW8HqKfMkm",
-    "amount": parsedAmount,
-    "currency": "INR",
-    "name": "Manor Mart",
-    "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
-    "config": {
-        "display": {
-            "blocks": {
-                "banks": {
-                    "name": "All Payment Options",
-                    "instruments": [
-                        {
-                            "method": "upi",
-                            "flows": ["collect", "qr"] // ⚡ Freeze karne wale intent ko rok kar QR aur Collect open karega
-                        },
-                        {
-                            "method": "card"
-                        },
-                        {
-                            "method": "netbanking"
-                        },
-                        {
-                            "method": "wallet"
-                        }
-                    ]
-                }
-            },
-            "sequence": ["block.banks"],
-            "preferences": {
-                "show_default_blocks": false
-            }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manor Mart - Secure Checkout</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-    },
-    "handler": async function (response) {
-        paymentProcessed = true;
-        await markOrderSuccessfulInFirebase(response.razorpay_payment_id);
-        showSuccessUI(response.razorpay_payment_id);
-    },
-    "modal": {
-        "ondismiss": function() { if (!paymentProcessed) showFailureUI(); }
-    },
-    "theme": { "color": "#4a148c" }
-};
+        .card {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+            margin-top: 15px;
+        }
+        h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
+        .amount { font-size: 28px; font-weight: bold; color: #2e7d32; margin: 10px 0; }
+        .btn-pay {
+            background-color: #6a1b9a;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 12px;
+        }
+        .status-box {
+            display: none;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .success-box { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .fail-box { background-color: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .action-btn {
+            display: block;
+            text-decoration: none;
+            padding: 12px 15px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 8px;
+            margin: 10px auto 0 auto;
+            width: 90%;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+        }
+        .btn-success { background-color: #2e7d32; color: white; }
+        .btn-retry { background-color: #e65100; color: white; }
+        .btn-return { background-color: #4a148c; color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>🛒 Manor Mart Payment</h2>
+        <p style="color: #666; font-size: 13px; margin: 4px 0;">Order Ref: <b id="display-order-id">Loading...</b></p>
+        <div class="amount">₹<span id="display-amount">0.00</span></div>
+        
+        <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI</button>
+        <div id="status-container" class="status-box"></div>
+    </div>
+
+    <script>
+        const dbUrl = "https://manorbiryani-default-rtdb.firebaseio.com/orders";
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        const amountRupees = urlParams.get('amount') || '10';
+        let orderId = urlParams.get('order_id') || urlParams.get('orderId') || '';
+
+        document.getElementById('display-amount').innerText = amountRupees;
+        if (orderId) document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+
+        let paymentProcessed = false;
+
+        async function markOrderSuccessfulInFirebase(paymentId) {
+            if (!orderId) return false;
+            try {
+                const res = await fetch(dbUrl + "/" + orderId + ".json", {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        deliveryStatus: 'Order Successful', 
+                        razorpayPaymentId: paymentId 
+                    })
+                });
+                return res.ok;
+            } catch (err) { return false; }
+        }
+
+        function showSuccessUI(paymentId) {
+            document.getElementById('pay-btn').style.display = 'none';
+            const statusDiv = document.getElementById('status-container');
+            statusDiv.className = 'status-box success-box';
+            statusDiv.style.display = 'block';
+            
+            const redirectUrl = `manormart://success?status=success&razorpay_payment_id=${paymentId}&order_id=${orderId}`;
+
+            statusDiv.innerHTML = `
+                <div style="font-size: 16px;">✅ Payment Successful!</div>
+                <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
+                <div style="font-size: 13px; margin-top: 8px; color: #1b5e20;">Order Confirmed! Returning to app...</div>
+                <a href="${redirectUrl}" class="action-btn btn-success">🔙 Open Manor Mart App Now</a>
+            `;
+
+            setTimeout(() => {
+                try {
+                    window.location.href = redirectUrl;
+                } catch(e) {}
+            }, 800);
+        }
+
+        function showFailureUI() {
+            document.getElementById('pay-btn').style.display = 'none';
+            const statusDiv = document.getElementById('status-container');
+            statusDiv.className = 'status-box fail-box';
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `
+                <div style="font-size: 15px;">❌ Payment Cancelled / Incomplete</div>
+                <div style="font-size: 11px; margin-top: 4px; color: #666;">Transaction complete nahi hui.</div>
+                <button onclick="startPayment()" class="action-btn btn-retry">🔄 Retry Payment</button>
+                <a href="manormart://" class="action-btn btn-return">🔙 Return to App</a>
+            `;
+        }
+
+        function startPayment() {
+            const parsedAmount = Math.round(Number(amountRupees) * 100);
+            var options = {
+                "key": "rzp_live_TbUQsW8HqKfMkm",
+                "amount": parsedAmount,
+                "currency": "INR",
+                "name": "Manor Mart",
+                "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
+                "config": {
+                    "display": {
+                        "blocks": {
+                            "banks": {
+                                "name": "All Payment Options",
+                                "instruments": [
+                                    {
+                                        "method": "upi",
+                                        "flows": ["collect", "qr"]
+                                    },
+                                    {
+                                        "method": "card"
+                                    },
+                                    {
+                                        "method": "netbanking"
+                                    },
+                                    {
+                                        "method": "wallet"
+                                    }
+                                ]
+                            }
+                        },
+                        "sequence": ["block.banks"],
+                        "preferences": {
+                            "show_default_blocks": false
+                        }
+                    }
+                },
+                "handler": async function (response) {
+                    paymentProcessed = true;
+                    await markOrderSuccessfulInFirebase(response.razorpay_payment_id);
+                    showSuccessUI(response.razorpay_payment_id);
+                },
+                "modal": {
+                    "ondismiss": function() { 
+                        if (!paymentProcessed) showFailureUI(); 
+                    }
+                },
+                "theme": { "color": "#4a148c" }
+            };
+
+            var rzp1 = new Razorpay(options);
+            rzp1.on('payment.failed', function (response) { 
+                showFailureUI(); 
+            });
+            rzp1.open();
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(startPayment, 400);
+        });
+    </script>
+</body>
+</html>
