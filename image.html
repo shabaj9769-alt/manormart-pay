@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manor Mart - Bulk Image Linker</title>
+    <title>Manor Mart Bulk Uploader</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -25,7 +25,7 @@
         .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 20px; }
         .upload-area {
             border: 2px dashed #7b1fa2;
-            padding: 20px;
+            padding: 22px;
             border-radius: 10px;
             text-align: center;
             background: #fdf7ff;
@@ -36,11 +36,11 @@
         .btn-select {
             background: #7b1fa2;
             color: white;
-            padding: 10px 18px;
+            padding: 10px 20px;
             border-radius: 6px;
             font-weight: bold;
             display: inline-block;
-            margin-top: 8px;
+            margin-top: 10px;
         }
         .status {
             margin-top: 15px;
@@ -48,6 +48,7 @@
             text-align: center;
             color: #4a148c;
             display: none;
+            font-size: 14px;
         }
         .item-row {
             display: flex;
@@ -60,10 +61,10 @@
             gap: 10px;
         }
         .item-thumb {
-            width: 45px;
-            height: 45px;
+            width: 50px;
+            height: 50px;
             object-fit: cover;
-            border-radius: 4px;
+            border-radius: 6px;
             background: #eee;
         }
         .item-info {
@@ -81,7 +82,7 @@
         .item-link {
             width: 95%;
             font-size: 11px;
-            padding: 4px;
+            padding: 5px;
             margin-top: 4px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -91,9 +92,9 @@
             background: #2e7d32;
             color: white;
             border: none;
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 12px;
             cursor: pointer;
             white-space: nowrap;
         }
@@ -120,7 +121,7 @@
 
     <label class="upload-area" for="fileInput">
         <div style="font-size: 32px;">📸</div>
-        <span style="font-size: 14px; color: #555;">Gallery se ek sath sabhi photos chunein</span><br>
+        <span style="font-size: 14px; color: #555;">Gallery se sabhi photos ek sath chunein</span><br>
         <span class="btn-select">Select Multiple Photos</span>
         <input type="file" id="fileInput" accept="image/*" multiple onchange="startBulkUpload()">
     </label>
@@ -133,21 +134,7 @@
 </div>
 
 <script>
-    const IMGBB_KEY = "8f3b6c2ecdc3a0beaa127b4bcba4b54e";
     let allLinksArray = [];
-
-    // Image ko base64 string mein badalne ke liye
-    function fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
-                resolve(encoded);
-            };
-            reader.onerror = error => reject(error);
-        });
-    }
 
     async function startBulkUpload() {
         const input = document.getElementById('fileInput');
@@ -168,22 +155,20 @@
             status.innerText = `Uploading (${i + 1}/${files.length}): ${file.name}...`;
 
             try {
-                const base64Data = await fileToBase64(file);
-
                 const formData = new FormData();
-                formData.append("key", IMGBB_KEY);
-                formData.append("image", base64Data);
+                formData.append('file', file);
+                formData.append('upload_preset', 'manor_mart_preset');
 
-                const res = await fetch("https://api.imgbb.com/1/upload", {
-                    method: "POST",
+                // Cloudinary Direct CDN Endpoint
+                const res = await fetch('https://api.cloudinary.com/v1_1/dxhyvcmun/image/upload', {
+                    method: 'POST',
                     body: formData
                 });
 
-                const json = await res.json();
+                const data = await res.json();
 
-                if (json.success && json.data) {
-                    // Direct image link (display_url ya url)
-                    const directUrl = json.data.display_url || json.data.url;
+                if (data.secure_url) {
+                    const directUrl = data.secure_url;
                     allLinksArray.push(directUrl);
 
                     const row = document.createElement('div');
@@ -198,14 +183,16 @@
                     `;
                     list.appendChild(row);
                 } else {
-                    console.error("Upload error response:", json);
+                    console.error("Upload error: ", data);
+                    alert(`Photo ${file.name} upload nahi hui: ` + (data.error?.message || 'Error'));
                 }
             } catch (err) {
-                console.error("Upload failed for: " + file.name, err);
+                console.error("Fetch error: ", err);
+                alert(`Error uploading ${file.name}: ` + err.message);
             }
         }
 
-        status.innerText = `✅ Done! Kul ${allLinksArray.length} photos ke direct links ban gaye!`;
+        status.innerText = `✅ Done! Kul ${allLinksArray.length} photos ke direct links ready hain!`;
         if (allLinksArray.length > 0) {
             copyAllBtn.style.display = "block";
         }
@@ -215,14 +202,14 @@
         const input = document.getElementById(elementId);
         input.select();
         document.execCommand('copy');
-        alert("Link copy ho gaya:\n" + input.value);
+        alert("Copied!");
     }
 
     function copyAllLinks() {
         if (!allLinksArray.length) return;
         const text = allLinksArray.join("\n");
         navigator.clipboard.writeText(text).then(() => {
-            alert("Saare " + allLinksArray.length + " links clipboard mein copy ho gaye!");
+            alert("Saare " + allLinksArray.length + " links copy ho gaye!");
         });
     }
 </script>
