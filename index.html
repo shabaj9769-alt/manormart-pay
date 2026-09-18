@@ -17,46 +17,46 @@
         }
         .card {
             background: white;
-            padding: 20px;
+            padding: 22px;
             border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             text-align: center;
             max-width: 420px;
             width: 100%;
-            margin-bottom: 15px;
+            margin-top: 15px;
         }
         h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
-        .amount { font-size: 26px; font-weight: bold; color: #2e7d32; margin: 10px 0; }
+        .amount { font-size: 28px; font-weight: bold; color: #2e7d32; margin: 10px 0; }
         .btn-pay {
             background-color: #6a1b9a;
             color: white;
             border: none;
             padding: 14px 20px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
             width: 100%;
-            margin-top: 10px;
+            margin-top: 12px;
         }
         .status-box {
             display: none;
             padding: 15px;
             border-radius: 8px;
-            margin-top: 12px;
+            margin-top: 15px;
             font-size: 14px;
             font-weight: bold;
         }
         .success-box { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
         .fail-box { background-color: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
         .action-btn {
-            display: inline-block;
+            display: block;
             text-decoration: none;
-            padding: 12px 20px;
+            padding: 12px 15px;
             font-size: 14px;
             font-weight: bold;
             border-radius: 8px;
-            margin-top: 8px;
+            margin: 10px auto 0 auto;
             width: 90%;
             cursor: pointer;
             border: none;
@@ -74,7 +74,7 @@
         <p style="color: #666; font-size: 13px; margin: 4px 0;">Order Ref: <b id="display-order-id">Loading...</b></p>
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         
-        <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Pay via UPI / Cards / NetBanking</button>
+        <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI</button>
         <div id="status-container" class="status-box"></div>
     </div>
 
@@ -96,7 +96,10 @@
                 const res = await fetch(dbUrl + "/" + orderId + ".json", {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ deliveryStatus: 'Order Successful', razorpayPaymentId: paymentId })
+                    body: JSON.stringify({ 
+                        deliveryStatus: 'Order Successful', 
+                        razorpayPaymentId: paymentId 
+                    })
                 });
                 return res.ok;
             } catch (err) { return false; }
@@ -111,14 +114,17 @@
             const redirectUrl = `manormart://success?status=success&razorpay_payment_id=${paymentId}&order_id=${orderId}`;
 
             statusDiv.innerHTML = `
-                <div>✅ Payment Successful!</div>
+                <div style="font-size: 16px;">✅ Payment Successful!</div>
                 <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
                 <div style="font-size: 13px; margin-top: 8px; color: #1b5e20;">Order Confirmed! Returning to app...</div>
                 <a href="${redirectUrl}" class="action-btn btn-success">🔙 Open Manor Mart App Now</a>
             `;
-            setTimeout(() => { 
-                window.location.href = redirectUrl; 
-            }, 1200);
+
+            setTimeout(() => {
+                try {
+                    window.location.href = redirectUrl;
+                } catch(e) {}
+            }, 800);
         }
 
         function showFailureUI() {
@@ -127,8 +133,8 @@
             statusDiv.className = 'status-box fail-box';
             statusDiv.style.display = 'block';
             statusDiv.innerHTML = `
-                <div>❌ Payment Cancelled / Incomplete</div>
-                <div style="font-size: 11px; margin-top: 4px; color: #666;">Aapka payment poora nahi hua.</div>
+                <div style="font-size: 15px;">❌ Payment Cancelled / Incomplete</div>
+                <div style="font-size: 11px; margin-top: 4px; color: #666;">Transaction complete nahi hui.</div>
                 <button onclick="startPayment()" class="action-btn btn-retry">🔄 Retry Payment</button>
                 <a href="manormart://" class="action-btn btn-return">🔙 Return to App</a>
             `;
@@ -142,22 +148,32 @@
                 "currency": "INR",
                 "name": "Manor Mart",
                 "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
+                "retry": {
+                    "enabled": true
+                },
                 "handler": async function (response) {
                     paymentProcessed = true;
                     await markOrderSuccessfulInFirebase(response.razorpay_payment_id);
                     showSuccessUI(response.razorpay_payment_id);
                 },
                 "modal": {
-                    "ondismiss": function() { if (!paymentProcessed) showFailureUI(); }
+                    "ondismiss": function() { 
+                        if (!paymentProcessed) showFailureUI(); 
+                    }
                 },
                 "theme": { "color": "#4a148c" }
             };
+
             var rzp1 = new Razorpay(options);
-            rzp1.on('payment.failed', function (response) { showFailureUI(); });
+            rzp1.on('payment.failed', function (response) { 
+                showFailureUI(); 
+            });
             rzp1.open();
         }
 
-        window.addEventListener('load', () => { setTimeout(startPayment, 400); });
+        window.addEventListener('load', () => {
+            setTimeout(startPayment, 300);
+        });
     </script>
 </body>
 </html>
