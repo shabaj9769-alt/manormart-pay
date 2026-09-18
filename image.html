@@ -1,199 +1,132 @@
 <!DOCTYPE html>
-<html lang="mr">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Final Compressed Image Hub</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <title>Manor Mart - Quick Image Uploader</title>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0b0f19; color: #f8fafc; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .box {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+        }
+        h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
+        p { color: #555; font-size: 13px; }
+        .file-input {
+            margin: 20px 0;
+            padding: 10px;
+            border: 2px dashed #6a1b9a;
+            border-radius: 8px;
+            width: 90%;
+            background: #faf5fc;
+        }
+        .btn-copy {
+            background: #2e7d32;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .result-box {
+            display: none;
+            margin-top: 20px;
+            padding: 12px;
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            border-radius: 8px;
+            text-align: left;
+            word-break: break-all;
+        }
+        .preview {
+            max-width: 100%;
+            height: 140px;
+            object-fit: contain;
+            border-radius: 6px;
+            margin-top: 10px;
+            display: none;
+        }
     </style>
 </head>
-<body class="min-h-screen flex flex-col p-3 md:p-6 pb-20">
+<body>
 
-    <!-- Header -->
-    <header class="max-w-xl w-full mx-auto bg-slate-900 border border-slate-800 p-4 rounded-3xl flex justify-between items-center shadow-xl mb-4">
-        <div class="flex items-center gap-2.5">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-lg shadow-lg">
-                🚀
-            </div>
-            <div>
-                <h1 class="font-extrabold text-sm md:text-base text-white">Image Hub & Link Maker</h1>
-                <p class="text-[10px] text-slate-400">100% Android & App Compatible</p>
-            </div>
-        </div>
-        <span class="text-[10px] font-bold bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-xl border border-emerald-500/20">
-            🟢 Final Ready
-        </span>
-    </header>
-
-    <!-- Main Container -->
-    <main class="max-w-xl w-full mx-auto flex-1 flex flex-col gap-4">
+    <div class="box">
+        <h2>⚡ Manor Mart Image Linker</h2>
+        <p>Canva photo select karein, direct <b>.jpg/.png</b> link turant mil jayega.</p>
         
-        <!-- Tab Switcher -->
-        <div class="grid grid-cols-2 gap-2 bg-slate-900 p-1.5 rounded-2xl border border-slate-800">
-            <button onclick="switchTab('upload')" id="tabUpload" class="py-2.5 rounded-xl text-xs font-black bg-emerald-600 text-white shadow transition">
-                📤 Upload & Compress
-            </button>
-            <button onclick="switchTab('ai')" id="tabAi" class="py-2.5 rounded-xl text-xs font-black text-slate-400 hover:text-white transition">
-                🤖 AI Generator
-            </button>
+        <input type="file" id="imageInput" class="file-input" accept="image/*" onchange="uploadImage()">
+        
+        <div id="loader" style="display:none; color:#6a1b9a; font-weight:bold; margin: 15px 0;">Uploading... Kirpya rukhein...</div>
+        
+        <img id="previewImg" class="preview">
+
+        <div id="resultBox" class="result-box">
+            <span style="font-size:12px; color:#2e7d32; font-weight:bold;">Direct Link:</span>
+            <input type="text" id="linkText" style="width:100%; margin-top:4px; padding:6px; font-size:12px;" readonly>
+            <button class="btn-copy" onclick="copyLink()">📋 Copy Direct URL</button>
         </div>
-
-        <!-- SECTION 1: UPLOAD & COMPRESS -->
-        <div id="sectionUpload" class="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4 shadow-xl">
-            <h2 class="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Select JPG/PNG Photo
-            </h2>
-            
-            <div class="border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-2xl p-6 text-center cursor-pointer bg-slate-950 transition" onclick="document.getElementById('fileInput').click()">
-                <input type="file" id="fileInput" accept="image/png, image/jpeg" class="hidden" onchange="handleImageCompression(event)">
-                <div class="space-y-2">
-                    <div class="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-emerald-400 text-lg">
-                        <i class="fa-solid fa-image"></i>
-                    </div>
-                    <p class="text-xs font-bold text-slate-300">Tap to choose photo</p>
-                    <p class="text-[10px] text-slate-500">Auto-compressed into safe Base64 URL</p>
-                </div>
-            </div>
-
-            <!-- Result Box -->
-            <div id="uploadResult" class="hidden space-y-3 pt-2">
-                <div class="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2 text-center space-y-2">
-                    <img id="previewImg" class="max-h-48 mx-auto rounded-xl object-contain">
-                    <p id="sizeInfo" class="text-[11px] font-bold text-emerald-400"></p>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-400 mb-1">Embedded Data URL (Safe for Apps):</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="liveUrlBox" readonly class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] font-mono text-emerald-400 focus:outline-none">
-                        <button onclick="copyLiveUrl()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shrink-0 cursor-pointer">
-                            Copy
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 2: AI COMMAND TO IMAGE -->
-        <div id="sectionAi" class="hidden bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4 shadow-xl">
-            <h2 class="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> AI Command Image Generator
-            </h2>
-            <div class="space-y-3">
-                <label class="block text-xs font-bold text-slate-400">Aapko kis tarah ki photo chahiye? (Command)</label>
-                <textarea id="aiPrompt" rows="3" placeholder="उदा. Modern transport truck banner..." class="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-white placeholder-slate-600 focus:outline-none focus:border-amber-500 resize-none"></textarea>
-                
-                <button onclick="generateAiImage()" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:brightness-110 text-white font-black rounded-xl text-xs uppercase tracking-wider shadow-lg transition cursor-pointer">
-                    Generate AI Image ⚡
-                </button>
-            </div>
-
-            <!-- AI Result Box -->
-            <div id="aiResult" class="hidden space-y-3 pt-2">
-                <div class="rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-2 text-center space-y-2">
-                    <img id="aiGeneratedImg" crossorigin="anonymous" class="max-h-48 mx-auto rounded-xl object-contain">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-400 mb-1">AI Image URL:</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="aiLiveUrlBox" readonly class="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-[11px] font-mono text-amber-400 focus:outline-none">
-                        <button onclick="copyAiLiveUrl()" class="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl text-xs shrink-0 cursor-pointer">
-                            Copy
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </main>
+    </div>
 
     <script>
-        function switchTab(tab) {
-            const upTab = document.getElementById('tabUpload');
-            const aiTab = document.getElementById('tabAi');
-            const upSec = document.getElementById('sectionUpload');
-            const aiSec = document.getElementById('sectionAi');
+        async function uploadImage() {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if (!file) return;
 
-            if(tab === 'upload') {
-                upTab.className = "py-2.5 rounded-xl text-xs font-black bg-emerald-600 text-white shadow transition";
-                aiTab.className = "py-2.5 rounded-xl text-xs font-black text-slate-400 hover:text-white transition";
-                upSec.classList.remove('hidden');
-                aiSec.classList.add('hidden');
-            } else {
-                aiTab.className = "py-2.5 rounded-xl text-xs font-black bg-amber-600 text-white shadow transition";
-                upTab.className = "py-2.5 rounded-xl text-xs font-black text-slate-400 hover:text-white transition";
-                aiSec.classList.remove('hidden');
-                upSec.classList.add('hidden');
-            }
-        }
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('resultBox').style.display = 'none';
+            document.getElementById('previewImg').style.display = 'none';
 
-        function handleImageCompression(event) {
-            const file = event.target.files[0];
-            if(!file) return;
+            const formData = new FormData();
+            formData.append('image', file);
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
-                    const maxWidth = 700;
+            try {
+                // Freeimage API jo direct link deta hai
+                const res = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await res.json();
+                document.getElementById('loader').style.display = 'none';
 
-                    if (width > maxWidth) {
-                        height = Math.round((height * maxWidth) / width);
-                        width = maxWidth;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.65);
-                    const base64Str = compressedDataUrl.split(',')[1];
-                    const sizeInKb = Math.round((base64Str.length * (3/4)) / 1024);
-
-                    document.getElementById('previewImg').src = compressedDataUrl;
-                    document.getElementById('sizeInfo').innerText = `Optimized Size: ~${sizeInKb} KB`;
-                    document.getElementById('liveUrlBox').value = compressedDataUrl;
-                    document.getElementById('uploadResult').classList.remove('hidden');
+                if (data && data.image && data.image.url) {
+                    const directUrl = data.image.url;
+                    document.getElementById('linkText').value = directUrl;
+                    document.getElementById('previewImg').src = directUrl;
+                    document.getElementById('previewImg').style.display = 'block';
+                    document.getElementById('resultBox').style.display = 'block';
+                } else {
+                    alert('Upload fail ho gaya. Kripya dobara try karein.');
                 }
+            } catch (err) {
+                document.getElementById('loader').style.display = 'none';
+                alert('Internet issue ya error: ' + err.message);
             }
-            reader.readAsDataURL(file);
         }
 
-        function copyLiveUrl() {
-            const box = document.getElementById('liveUrlBox');
-            box.select();
-            navigator.clipboard.writeText(box.value);
-            alert("Data URL copied successfully!");
-        }
-
-        function generateAiImage() {
-            const prompt = document.getElementById('aiPrompt').value.trim();
-            if(!prompt) {
-                alert("Kripya command likhein!");
-                return;
-            }
-
-            const encodedPrompt = encodeURIComponent(prompt);
-            const aiImageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}`;
-
-            document.getElementById('aiGeneratedImg').src = aiImageUrl;
-            document.getElementById('aiLiveUrlBox').value = aiImageUrl;
-            document.getElementById('aiResult').classList.remove('hidden');
-        }
-
-        function copyAiLiveUrl() {
-            const box = document.getElementById('aiLiveUrlBox');
-            box.select();
-            navigator.clipboard.writeText(box.value);
-            alert("AI Image URL copied!");
+        function copyLink() {
+            const copyText = document.getElementById('linkText');
+            copyText.select();
+            document.execCommand('copy');
+            alert('Direct Image URL clipboard mein copy ho gaya!');
         }
     </script>
 </body>
