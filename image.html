@@ -3,131 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manor Mart - Quick Image Uploader</title>
+    <title>Manor Mart - Bulk Image Uploader</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background: #f4f4f9;
+            background: #f0f2f5;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
         }
-        .box {
-            background: white;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-width: 420px;
+        .container {
+            background: #ffffff;
             width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        h2 { color: #4a148c; text-align: center; margin-top: 5px; font-size: 20px; }
+        .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 20px; }
+        .upload-area {
+            border: 2px dashed #7b1fa2;
+            padding: 20px;
+            border-radius: 10px;
             text-align: center;
+            background: #fdf7ff;
+            cursor: pointer;
         }
-        h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
-        p { color: #555; font-size: 13px; }
-        .file-input {
-            margin: 20px 0;
-            padding: 10px;
-            border: 2px dashed #6a1b9a;
+        input[type="file"] { display: none; }
+        .btn-select {
+            background: #7b1fa2;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        .status {
+            margin-top: 15px;
+            font-weight: bold;
+            text-align: center;
+            color: #4a148c;
+            display: none;
+        }
+        .item-row {
+            display: flex;
+            align-items: center;
+            background: #fafafa;
+            border: 1px solid #e0e0e0;
             border-radius: 8px;
-            width: 90%;
-            background: #faf5fc;
+            padding: 8px;
+            margin-top: 10px;
+            gap: 10px;
         }
-        .btn-copy {
+        .item-thumb {
+            width: 45px;
+            height: 45px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .item-name {
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #333;
+        }
+        .item-link {
+            width: 95%;
+            font-size: 11px;
+            padding: 4px;
+            margin-top: 4px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+        }
+        .btn-copy-one {
             background: #2e7d32;
             color: white;
             border: none;
-            padding: 10px 16px;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .btn-copy-all {
+            background: #1565c0;
+            color: white;
+            border: none;
+            padding: 12px;
+            width: 100%;
+            border-radius: 8px;
             font-size: 14px;
             font-weight: bold;
-            border-radius: 6px;
             cursor: pointer;
-            margin-top: 10px;
-            width: 100%;
-        }
-        .result-box {
-            display: none;
-            margin-top: 20px;
-            padding: 12px;
-            background: #e8f5e9;
-            border: 1px solid #a5d6a7;
-            border-radius: 8px;
-            text-align: left;
-            word-break: break-all;
-        }
-        .preview {
-            max-width: 100%;
-            height: 140px;
-            object-fit: contain;
-            border-radius: 6px;
-            margin-top: 10px;
+            margin-top: 15px;
             display: none;
         }
     </style>
 </head>
 <body>
 
-    <div class="box">
-        <h2>⚡ Manor Mart Image Linker</h2>
-        <p>Canva photo select karein, direct <b>.jpg/.png</b> link turant mil jayega.</p>
-        
-        <input type="file" id="imageInput" class="file-input" accept="image/*" onchange="uploadImage()">
-        
-        <div id="loader" style="display:none; color:#6a1b9a; font-weight:bold; margin: 15px 0;">Uploading... Kirpya rukhein...</div>
-        
-        <img id="previewImg" class="preview">
+<div class="container">
+    <h2>⚡ Manor Mart Bulk Uploader</h2>
+    <div class="subtitle">Ek sath 15-20 photos select karein aur direct link paayein.</div>
 
-        <div id="resultBox" class="result-box">
-            <span style="font-size:12px; color:#2e7d32; font-weight:bold;">Direct Link:</span>
-            <input type="text" id="linkText" style="width:100%; margin-top:4px; padding:6px; font-size:12px;" readonly>
-            <button class="btn-copy" onclick="copyLink()">📋 Copy Direct URL</button>
-        </div>
-    </div>
+    <label class="upload-area" for="fileInput">
+        <div style="font-size: 30px;">📸</div>
+        <span style="font-size: 14px; color: #555;">Gallery se ek sath sabhi photos chunein</span><br>
+        <span class="btn-select">Select Multiple Photos</span>
+        <input type="file" id="fileInput" accept="image/*" multiple onchange="startBulkUpload()">
+    </label>
 
-    <script>
-        async function uploadImage() {
-            const fileInput = document.getElementById('imageInput');
-            const file = fileInput.files[0];
-            if (!file) return;
+    <div id="status" class="status"></div>
 
-            document.getElementById('loader').style.display = 'block';
-            document.getElementById('resultBox').style.display = 'none';
-            document.getElementById('previewImg').style.display = 'none';
+    <button id="btnCopyAll" class="btn-copy-all" onclick="copyAllLinks()">📋 Copy All 15+ Links Together</button>
 
-            const formData = new FormData();
-            formData.append('image', file);
+    <div id="linksList"></div>
+</div>
+
+<script>
+    const IMGBB_KEY = "8f3b6c2ecdc3a0beaa127b4bcba4b54e"; 
+    let allLinksArray = [];
+
+    async function startBulkUpload() {
+        const input = document.getElementById('fileInput');
+        const files = input.files;
+        if (!files.length) return;
+
+        const status = document.getElementById('status');
+        const list = document.getElementById('linksList');
+        const copyAllBtn = document.getElementById('btnCopyAll');
+
+        list.innerHTML = "";
+        allLinksArray = [];
+        status.style.display = "block";
+        copyAllBtn.style.display = "none";
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            status.innerText = `Uploading (${i + 1}/${files.length}): ${file.name}...`;
 
             try {
-                // Freeimage API jo direct link deta hai
-                const res = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
-                    method: 'POST',
+                const formData = new FormData();
+                formData.append("image", file);
+
+                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, {
+                    method: "POST",
                     body: formData
                 });
-                
-                const data = await res.json();
-                document.getElementById('loader').style.display = 'none';
 
-                if (data && data.image && data.image.url) {
-                    const directUrl = data.image.url;
-                    document.getElementById('linkText').value = directUrl;
-                    document.getElementById('previewImg').src = directUrl;
-                    document.getElementById('previewImg').style.display = 'block';
-                    document.getElementById('resultBox').style.display = 'block';
-                } else {
-                    alert('Upload fail ho gaya. Kripya dobara try karein.');
+                const data = await res.json();
+
+                if (data.success && data.data.url) {
+                    const directUrl = data.data.display_url || data.data.url;
+                    allLinksArray.push(directUrl);
+
+                    const row = document.createElement('div');
+                    row.className = "item-row";
+                    row.innerHTML = `
+                        <img src="${directUrl}" class="item-thumb">
+                        <div class="item-info">
+                            <div class="item-name">${file.name}</div>
+                            <input type="text" value="${directUrl}" class="item-link" id="link_${i}" readonly>
+                        </div>
+                        <button class="btn-copy-one" onclick="copySingle('link_${i}')">Copy</button>
+                    `;
+                    list.appendChild(row);
                 }
             } catch (err) {
-                document.getElementById('loader').style.display = 'none';
-                alert('Internet issue ya error: ' + err.message);
+                console.error(err);
             }
         }
 
-        function copyLink() {
-            const copyText = document.getElementById('linkText');
-            copyText.select();
-            document.execCommand('copy');
-            alert('Direct Image URL clipboard mein copy ho gaya!');
+        status.innerText = `✅ Upload Complete! Kul ${allLinksArray.length} photos ready hain.`;
+        if (allLinksArray.length > 0) {
+            copyAllBtn.style.display = "block";
         }
-    </script>
+    }
+
+    function copySingle(elementId) {
+        const input = document.getElementById(elementId);
+        input.select();
+        document.execCommand('copy');
+        alert("Copied: " + input.value);
+    }
+
+    function copyAllLinks() {
+        if (!allLinksArray.length) return;
+        const text = allLinksArray.join("\n");
+        navigator.clipboard.writeText(text).then(() => {
+            alert("Saare " + allLinksArray.length + " links copy ho gaye!");
+        });
+    }
+</script>
+
 </body>
 </html>
