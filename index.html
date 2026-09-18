@@ -148,33 +148,8 @@
                 "currency": "INR",
                 "name": "Manor Mart",
                 "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
-                "config": {
-                    "display": {
-                        "blocks": {
-                            "banks": {
-                                "name": "All Payment Options",
-                                "instruments": [
-                                    {
-                                        "method": "upi",
-                                        "flows": ["collect", "qr"]
-                                    },
-                                    {
-                                        "method": "card"
-                                    },
-                                    {
-                                        "method": "netbanking"
-                                    },
-                                    {
-                                        "method": "wallet"
-                                    }
-                                ]
-                            }
-                        },
-                        "sequence": ["block.banks"],
-                        "preferences": {
-                            "show_default_blocks": false
-                        }
-                    }
+                "retry": {
+                    "enabled": true
                 },
                 "handler": async function (response) {
                     paymentProcessed = true;
@@ -197,7 +172,7 @@
         }
 
         window.addEventListener('load', () => {
-            setTimeout(startPayment, 400);
+            setTimeout(startPayment, 350);
         });
     </script>
 </body>
