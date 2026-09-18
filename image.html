@@ -156,19 +156,18 @@
 
             try {
                 const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', 'manor_mart_preset');
+                formData.append('reqtype', 'fileupload');
+                formData.append('fileToUpload', file);
 
-                // Cloudinary Direct CDN Endpoint
-                const res = await fetch('https://api.cloudinary.com/v1_1/dxhyvcmun/image/upload', {
+                // Direct Catbox upload endpoint (No API Key Required)
+                const res = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://catbox.moe/user/api.php'), {
                     method: 'POST',
                     body: formData
                 });
 
-                const data = await res.json();
+                const directUrl = (await res.text()).trim();
 
-                if (data.secure_url) {
-                    const directUrl = data.secure_url;
+                if (directUrl.startsWith('http')) {
                     allLinksArray.push(directUrl);
 
                     const row = document.createElement('div');
@@ -183,12 +182,12 @@
                     `;
                     list.appendChild(row);
                 } else {
-                    console.error("Upload error: ", data);
-                    alert(`Photo ${file.name} upload nahi hui: ` + (data.error?.message || 'Error'));
+                    console.error("Upload error: ", directUrl);
+                    alert(`Error in ${file.name}: ` + directUrl);
                 }
             } catch (err) {
                 console.error("Fetch error: ", err);
-                alert(`Error uploading ${file.name}: ` + err.message);
+                alert(`Upload failed for ${file.name}: ` + err.message);
             }
         }
 
