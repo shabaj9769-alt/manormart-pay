@@ -74,7 +74,7 @@
         <p style="color: #666; font-size: 13px; margin: 4px 0;">Order Ref: <b id="display-order-id">Loading...</b></p>
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         
-        <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI</button>
+        <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI / Cards</button>
         <div id="status-container" class="status-box"></div>
     </div>
 
@@ -140,14 +140,35 @@
             `;
         }
 
-        function startPayment() {
+        async function startPayment() {
             const parsedAmount = Math.round(Number(amountRupees) * 100);
+            let razorpayOrderId = "";
+
+            try {
+                // Backend se official Razorpay Order ID mangwayein
+                let res = await fetch('/api/create-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        amount: amountRupees, 
+                        receipt: orderId ? orderId.slice(-10) : 'ord_' + Date.now() 
+                    })
+                });
+                let orderData = await res.json();
+                if (orderData && orderData.id) {
+                    razorpayOrderId = orderData.id;
+                }
+            } catch (err) {
+                console.log("Order generation error:", err);
+            }
+
             var options = {
-                "key": "rzp_live_TbUQsW8HqKfMkm",
+                "key": "rzp_live_TeDnM48KoTZovk", // Nayi Key ID
                 "amount": parsedAmount,
                 "currency": "INR",
                 "name": "Manor Mart",
                 "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
+                "order_id": razorpayOrderId, // ⚡ Isse PhonePe, Google Pay aur Paytm unlock ho jayenge
                 "retry": {
                     "enabled": true
                 },
@@ -172,7 +193,7 @@
         }
 
         window.addEventListener('load', () => {
-            setTimeout(startPayment, 350);
+            setTimeout(startPayment, 400);
         });
     </script>
 </body>
