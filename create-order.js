@@ -1,22 +1,32 @@
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Only POST allowed' });
+  if (req.method === 'GET') {
+    return res.status(200).json({ status: 'ok', message: 'Razorpay API active & secure!' });
   }
 
   try {
-    const { amount, receipt } = req.body;
-    
-    // Aapki exact nayi Razorpay Keys
-    const keyId = "rzp_live_TeDnM48KoTZovk";
-    const keySecret = "T54OOvBkkPLXCm7E5lloSZzW"; 
+    let body = req.body || {};
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch(e) {}
+    }
+
+    const amount = body.amount || 10;
+    const receipt = body.receipt ? String(body.receipt).slice(-20) : 'ord_' + Date.now();
+
+    // Vercel Environment Variables se safe keys uthayega
+    const keyId = process.env.RZP_KEY_ID;
+    const keySecret = process.env.RZP_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      return res.status(500).json({ error: "API credentials not configured in Vercel." });
+    }
 
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
 
@@ -27,15 +37,15 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        amount: Math.round(Number(amount) * 100), // Rupees se paise me convert
+        amount: Math.round(Number(amount) * 100),
         currency: 'INR',
-        receipt: receipt || 'rcpt_' + Date.now()
+        receipt: receipt
       })
     });
 
     const data = await response.json();
-    return res.status(200).json(data);
+    return res.status(response.status).json(data);
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
-}
+};
