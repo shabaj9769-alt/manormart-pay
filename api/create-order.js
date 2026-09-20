@@ -1,14 +1,14 @@
 module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  // Clean CORS headers (Chrome ya kisi bhi browser me block nahi hoga)
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Browser test ke liye
+  // Direct browser check status
   if (req.method === 'GET') {
     return res.status(200).json({ status: 'ok', message: 'Razorpay API active!' });
   }
@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        amount: Math.round(Number(amount) * 100),
+        amount: Math.round(Number(amount) * 100), // Convert to paise
         currency: 'INR',
         receipt: receipt
       })
