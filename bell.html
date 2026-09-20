@@ -20,7 +20,7 @@
     
     /* Broadcast Box */
     .broadcast-card { width: 100%; max-width: 450px; background: #fff; border-radius: 12px; padding: 16px; margin-top: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-top: 4px solid #6a1b9a; }
-    .broadcast-card h3 { font-size: 14px; color: #4a148c; margin-bottom: 10px; }
+    .broadcast-card h3 { font-size: 14px; color: #4a1b9a; margin-bottom: 10px; }
     .input-box { width: 100%; padding: 10px; border: 1px solid #ce93d8; border-radius: 6px; font-size: 13px; margin-bottom: 10px; }
     .send-offer-btn { width: 100%; background: #6a1b9a; color: #fff; border: none; padding: 12px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; }
     
@@ -29,6 +29,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Hidden background sound anchor to keep Chrome audio engine active -->
+  <audio id="silentAudioLoop" loop playsinline style="display:none;"></audio>
 
   <div class="header">
     <h1>🛒 Manor Mart Store Terminal</h1>
@@ -43,7 +46,7 @@
   <div id="sirenCard" class="siren-alert-card">
     <h2>🚨 NAYA ORDER AAYA HAI! 🚨</h2>
     <p id="sirenDetails" style="font-size: 15px; font-weight: bold; margin-top: 6px;"></p>
-    <button class="mute-btn" onclick="stopSiren()">🔕 Awaz Band Karein (Order Check Kiya)</button>
+    <button class="mute-btn" onclick="stopSiren()">🔕 Awaz Band Karein (Agla Order Suno)</button>
   </div>
 
   <!-- INSTANT PUSH OFFER BROADCASTER -->
@@ -78,46 +81,52 @@
     let sirenInterval = null;
     let isServiceActive = false;
     let wakeLock = null;
-    let appStartTime = Date.now() - 30000;
+    let lastCheckedTime = Date.now();
 
-    // 1. Screen WakeLock Engine (Screen ko khud band nahi hone dega)
+    const SILENT_WAV = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
+    async function ensureAudioActive() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        try { await audioCtx.resume(); } catch(e) {}
+      }
+    }
+
     async function requestWakeLock() {
       try {
         if ('wakeLock' in navigator) {
           wakeLock = await navigator.wakeLock.request('screen');
         }
-      } catch (err) {
-        console.log("WakeLock Note:", err);
-      }
+      } catch (err) {}
     }
 
-    // 2. Auto-Resume when Screen is turned ON again
+    // Auto revive on visibility or touch
     document.addEventListener("visibilitychange", async () => {
-      if (document.visibilityState === "visible" && isServiceActive) {
-        // Audio resume karein
-        if (audioCtx && audioCtx.state === 'suspended') {
-          try { await audioCtx.resume(); } catch(e){}
-        }
-        // WakeLock dubara lagayein
+      if (isServiceActive) {
+        await ensureAudioActive();
         await requestWakeLock();
-        
-        // Status badge ko active show karein
-        const badge = document.getElementById('serviceStatus');
-        badge.textContent = "🟢 Live Bell Online";
-        badge.style.background = "#c8e6c9";
-        badge.style.color = "#1b5e20";
       }
     });
 
-    // 3. Siren Tone Engine
+    window.addEventListener("focus", async () => {
+      if (isServiceActive) await ensureAudioActive();
+    });
+
+    document.body.addEventListener("click", async () => {
+      if (isServiceActive) await ensureAudioActive();
+    });
+
     function playBeepTone(freq, duration) {
       if (!audioCtx) return;
       try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
         osc.type = "sawtooth";
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
@@ -148,27 +157,29 @@
         sirenInterval = null;
       }
       document.getElementById('sirenCard').style.display = 'none';
+      // Update baseline time so only orders coming AFTER muting will trigger new siren
+      lastCheckedTime = Date.now();
     }
 
-    // 4. Bell Activate Function
     async function startOrderListener() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-      }
+      await ensureAudioActive();
+
+      try {
+        const silentAudio = document.getElementById('silentAudioLoop');
+        silentAudio.src = SILENT_WAV;
+        await silentAudio.play();
+      } catch(e) {}
 
       isServiceActive = true;
+      lastCheckedTime = Date.now();
       await requestWakeLock();
 
       document.getElementById('startBtn').style.display = 'none';
       const badge = document.getElementById('serviceStatus');
-      badge.textContent = "🟢 Live Bell Online";
+      badge.textContent = "🟢 Live Bell Online & Ready";
       badge.style.background = "#c8e6c9";
       badge.style.color = "#1b5e20";
 
-      // Testing short beep to confirm speaker unlock
       playBeepTone(800, 0.15);
 
       // Listen for fresh orders
@@ -178,7 +189,8 @@
 
         let orderTs = Number(order.timestamp || snapshot.key.replace(/[^0-9]/g, '')) || Date.now();
 
-        if (orderTs > appStartTime) {
+        // Trigger siren only if order arrived AFTER activation or AFTER last mute action
+        if (orderTs > lastCheckedTime) {
           document.getElementById('sirenCard').style.display = 'block';
           document.getElementById('sirenDetails').textContent = 
             `Order #${snapshot.key.slice(-6)} | ₹${order.total || '0'} | ${order.name || 'Customer'}`;
@@ -207,7 +219,6 @@
       container.prepend(card);
     }
 
-    // 5. Instant Broadcast Push Engine
     async function sendBroadcastOffer() {
       const title = document.getElementById('offerTitle').value.trim();
       const body = document.getElementById('offerBody').value.trim();
