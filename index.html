@@ -65,11 +65,14 @@
         .btn-success { background-color: #2e7d32; color: white; }
         .btn-retry { background-color: #e65100; color: white; }
         .btn-return { background-color: #4a148c; color: white; }
-        .loading-spinner {
-            color: #6a1b9a;
-            font-size: 13px;
-            margin-top: 10px;
-            display: none;
+        .live-tag {
+            font-size: 11px;
+            color: #555;
+            background: #eee;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            display: inline-block;
         }
     </style>
 </head>
@@ -81,7 +84,7 @@
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         
         <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI / Cards</button>
-        <div id="loading-txt" class="loading-spinner">⏳ Connecting to Secure Gateway...</div>
+        <div id="debug-status" class="live-tag">Server: Ready</div>
         <div id="status-container" class="status-box"></div>
     </div>
 
@@ -114,7 +117,7 @@
 
         function showSuccessUI(paymentId) {
             document.getElementById('pay-btn').style.display = 'none';
-            document.getElementById('loading-txt').style.display = 'none';
+            document.getElementById('debug-status').style.display = 'none';
             const statusDiv = document.getElementById('status-container');
             statusDiv.className = 'status-box success-box';
             statusDiv.style.display = 'block';
@@ -137,7 +140,6 @@
 
         function showFailureUI() {
             document.getElementById('pay-btn').style.display = 'none';
-            document.getElementById('loading-txt').style.display = 'none';
             const statusDiv = document.getElementById('status-container');
             statusDiv.className = 'status-box fail-box';
             statusDiv.style.display = 'block';
@@ -151,11 +153,9 @@
 
         async function startPayment() {
             const parsedAmount = Math.round(Number(amountRupees) * 100);
-            const loadEl = document.getElementById('loading-txt');
-            const payBtn = document.getElementById('pay-btn');
+            const debugEl = document.getElementById('debug-status');
             
-            if (loadEl) loadEl.style.display = 'block';
-            if (payBtn) payBtn.style.display = 'none';
+            if (debugEl) debugEl.innerText = "⏳ Generating Official Razorpay Order...";
 
             let razorpayOrderId = "";
 
@@ -173,15 +173,13 @@
                 
                 if (orderData && orderData.id) {
                     razorpayOrderId = orderData.id;
+                    if (debugEl) debugEl.innerText = "✅ Order Linked: " + orderData.id;
                 } else {
-                    alert("Order Issue: " + JSON.stringify(orderData));
+                    if (debugEl) debugEl.innerText = "⚠️ Server Issue: " + JSON.stringify(orderData);
                 }
             } catch (err) {
-                alert("Connection Issue: " + err.message);
+                if (debugEl) debugEl.innerText = "⚠️ Connection Issue: " + err.message;
             }
-
-            if (loadEl) loadEl.style.display = 'none';
-            if (payBtn) payBtn.style.display = 'block';
 
             var options = {
                 "key": "rzp_live_TeDnM48KoTZovk",
