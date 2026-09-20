@@ -160,7 +160,6 @@
             let razorpayOrderId = "";
 
             try {
-                // Vercel serverless backend se official Razorpay order_id mangwayein
                 let res = await fetch('https://manormart-pay.vercel.app/api/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -169,12 +168,16 @@
                         receipt: orderId ? orderId.slice(-10) : 'ord_' + Date.now() 
                     })
                 });
+                
                 let orderData = await res.json();
+                
                 if (orderData && orderData.id) {
                     razorpayOrderId = orderData.id;
+                } else {
+                    alert("Order Issue: " + JSON.stringify(orderData));
                 }
             } catch (err) {
-                console.log("Order generation error:", err);
+                alert("Connection Issue: " + err.message);
             }
 
             if (loadEl) loadEl.style.display = 'none';
@@ -186,10 +189,8 @@
                 "currency": "INR",
                 "name": "Manor Mart",
                 "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
-                "order_id": razorpayOrderId, // UPI (PhonePe, Google Pay, Paytm) isi se unlock hoga
-                "retry": {
-                    "enabled": true
-                },
+                "order_id": razorpayOrderId,
+                "retry": { "enabled": true },
                 "handler": async function (response) {
                     paymentProcessed = true;
                     await markOrderSuccessfulInFirebase(response.razorpay_payment_id);
@@ -211,7 +212,7 @@
         }
 
         window.addEventListener('load', () => {
-            setTimeout(startPayment, 450);
+            setTimeout(startPayment, 500);
         });
     </script>
 </body>
