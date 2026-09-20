@@ -65,6 +65,12 @@
         .btn-success { background-color: #2e7d32; color: white; }
         .btn-retry { background-color: #e65100; color: white; }
         .btn-return { background-color: #4a148c; color: white; }
+        .loading-spinner {
+            color: #6a1b9a;
+            font-size: 13px;
+            margin-top: 10px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -75,6 +81,7 @@
         <div class="amount">₹<span id="display-amount">0.00</span></div>
         
         <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI / Cards</button>
+        <div id="loading-txt" class="loading-spinner">⏳ Connecting to Secure Gateway...</div>
         <div id="status-container" class="status-box"></div>
     </div>
 
@@ -107,6 +114,7 @@
 
         function showSuccessUI(paymentId) {
             document.getElementById('pay-btn').style.display = 'none';
+            document.getElementById('loading-txt').style.display = 'none';
             const statusDiv = document.getElementById('status-container');
             statusDiv.className = 'status-box success-box';
             statusDiv.style.display = 'block';
@@ -129,6 +137,7 @@
 
         function showFailureUI() {
             document.getElementById('pay-btn').style.display = 'none';
+            document.getElementById('loading-txt').style.display = 'none';
             const statusDiv = document.getElementById('status-container');
             statusDiv.className = 'status-box fail-box';
             statusDiv.style.display = 'block';
@@ -142,11 +151,17 @@
 
         async function startPayment() {
             const parsedAmount = Math.round(Number(amountRupees) * 100);
+            const loadEl = document.getElementById('loading-txt');
+            const payBtn = document.getElementById('pay-btn');
+            
+            if (loadEl) loadEl.style.display = 'block';
+            if (payBtn) payBtn.style.display = 'none';
+
             let razorpayOrderId = "";
 
             try {
-                // Backend se official Razorpay Order ID mangwayein
-                let res = await fetch('/api/create-order', {
+                // Vercel serverless backend se official Razorpay order_id mangwayein
+                let res = await fetch('https://manormart-pay.vercel.app/api/create-order', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -162,13 +177,16 @@
                 console.log("Order generation error:", err);
             }
 
+            if (loadEl) loadEl.style.display = 'none';
+            if (payBtn) payBtn.style.display = 'block';
+
             var options = {
-                "key": "rzp_live_TeDnM48KoTZovk", // Nayi Key ID
+                "key": "rzp_live_TeDnM48KoTZovk",
                 "amount": parsedAmount,
                 "currency": "INR",
                 "name": "Manor Mart",
                 "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
-                "order_id": razorpayOrderId, // ⚡ Isse PhonePe, Google Pay aur Paytm unlock ho jayenge
+                "order_id": razorpayOrderId, // UPI (PhonePe, Google Pay, Paytm) isi se unlock hoga
                 "retry": {
                     "enabled": true
                 },
@@ -193,7 +211,7 @@
         }
 
         window.addEventListener('load', () => {
-            setTimeout(startPayment, 400);
+            setTimeout(startPayment, 450);
         });
     </script>
 </body>
