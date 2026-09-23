@@ -1,4 +1,6 @@
-const admin = require("firebase-admin");
+const { initializeApp, getApps, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const { getDatabase, ServerValue } = require("firebase-admin/database");
 const Razorpay = require("razorpay");
 
 function setCors(res) {
@@ -14,8 +16,10 @@ function setCors(res) {
 }
 
 function initFirebase() {
-  if (admin.apps.length > 0) {
-    return admin.app();
+  const existingApps = getApps();
+
+  if (existingApps.length > 0) {
+    return existingApps[0];
   }
 
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -42,8 +46,8 @@ function initFirebase() {
     );
   }
 
-  return admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  return initializeApp({
+    credential: cert(serviceAccount),
     databaseURL:
       process.env.FIREBASE_DATABASE_URL ||
       "https://manorbiryani-default-rtdb.firebaseio.com",
@@ -74,14 +78,8 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // -----------------------------------------
-    // Firebase Admin initialization
-    // -----------------------------------------
-    const firebaseApp = initFirebase();
+    const app = initFirebase();
 
-    // -----------------------------------------
-    // Verify Firebase ID Token
-    // -----------------------------------------
     const idToken = getBearerToken(req);
 
     if (!idToken) {
@@ -90,15 +88,12 @@ module.exports = async (req, res) => {
       });
     }
 
-    const decodedToken = await firebaseApp
-      .auth()
-      .verifyIdToken(idToken);
+    const auth = getAuth(app);
+
+    const decodedToken = await auth.verifyIdToken(idToken);
 
     const uid = decodedToken.uid;
 
-    // -----------------------------------------
-    // Read request body
-    // -----------------------------------------
     let body = req.body || {};
 
     if (typeof body === "string") {
@@ -121,11 +116,10 @@ module.exports = async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // Read order from Firebase
-    // -----------------------------------------
-    const db = firebaseApp.database();
+    const db = getDatabase(app);
+
     const orderRef = db.ref(`orders/${orderId}`);
+
     const snapshot = await orderRef.once("value");
 
     if (!snapshot.exists()) {
@@ -136,19 +130,12 @@ module.exports = async (req, res) => {
 
     const order = snapshot.val();
 
-    // -----------------------------------------
-    // Verify order ownership
-    // -----------------------------------------
     if (!order.uid || String(order.uid) !== String(uid)) {
       return res.status(403).json({
         error: "You are not allowed to pay for this order.",
       });
     }
 
-    // -----------------------------------------
-    // Do not create Razorpay order for
-    // completed/cancelled orders
-    // -----------------------------------------
     const deliveryStatus = String(
       order.deliveryStatus || ""
     ).toLowerCase();
@@ -163,9 +150,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // Make sure this is an online payment
-    // -----------------------------------------
     const paymentMethod = String(
       order.payment || ""
     ).toLowerCase();
@@ -179,11 +163,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // IMPORTANT:
-    // Amount comes ONLY from Firebase order.
-    // Never trust amount sent by the app.
-    // -----------------------------------------
     const total = Number(order.total);
 
     if (!Number.isFinite(total) || total <= 0) {
@@ -194,11 +173,6 @@ module.exports = async (req, res) => {
 
     const amountPaise = Math.round(total * 100);
 
-    // -----------------------------------------
-    // If Razorpay order already exists,
-    // reuse it instead of creating duplicate
-    // payment orders.
-    // -----------------------------------------
     if (
       order.razorpayOrderId &&
       String(order.paymentStatus || "").toLowerCase() === "pending"
@@ -212,9 +186,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // Razorpay credentials
-    // -----------------------------------------
     const keyId = process.env.RZP_KEY_ID;
     const keySecret = process.env.RZP_KEY_SECRET;
 
@@ -229,9 +200,6 @@ module.exports = async (req, res) => {
       key_secret: keySecret,
     });
 
-    // -----------------------------------------
-    // Create Razorpay order
-    // -----------------------------------------
     const razorpayOrder = await razorpay.orders.create({
       amount: amountPaise,
       currency: "INR",
@@ -242,21 +210,15 @@ module.exports = async (req, res) => {
       },
     });
 
-    // -----------------------------------------
-    // Save payment information in Firebase
-    // -----------------------------------------
     await orderRef.update({
       razorpayOrderId: razorpayOrder.id,
       paymentAmountPaise: amountPaise,
       paymentCurrency: "INR",
       paymentStatus: "pending",
-      paymentCreatedAt: admin.database.ServerValue.TIMESTAMP,
+      paymentCreatedAt: ServerValue.TIMESTAMP,
       deliveryStatus: "Awaiting Payment",
     });
 
-    // -----------------------------------------
-    // Send safe response to app
-    // -----------------------------------------
     return res.status(200).json({
       success: true,
       razorpayOrderId: razorpayOrder.id,
