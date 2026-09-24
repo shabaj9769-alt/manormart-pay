@@ -1,217 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manor Mart - Secure Checkout</title>
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .card {
-            background: white;
-            padding: 22px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 420px;
-            width: 100%;
-            margin-top: 15px;
-        }
-        h2 { color: #4a148c; margin-top: 0; font-size: 20px; }
-        .amount { font-size: 28px; font-weight: bold; color: #2e7d32; margin: 10px 0; }
-        .btn-pay {
-            background-color: #6a1b9a;
-            color: white;
-            border: none;
-            padding: 14px 20px;
-            font-size: 15px;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 12px;
-        }
-        .status-box {
-            display: none;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .success-box { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .fail-box { background-color: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
-        .action-btn {
-            display: block;
-            text-decoration: none;
-            padding: 12px 15px;
-            font-size: 14px;
-            font-weight: bold;
-            border-radius: 8px;
-            margin: 10px auto 0 auto;
-            width: 90%;
-            cursor: pointer;
-            border: none;
-            text-align: center;
-        }
-        .btn-success { background-color: #2e7d32; color: white; }
-        .btn-retry { background-color: #e65100; color: white; }
-        .btn-return { background-color: #4a148c; color: white; }
-        .live-tag {
-            font-size: 11px;
-            color: #555;
-            background: #eee;
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin-top: 8px;
-            display: inline-block;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manor Mart - Secure Payment</title>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3e5f5;font-family:Arial,Helvetica,sans-serif;padding:16px}
+  .card{width:100%;max-width:380px;background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 18px rgba(74,20,140,.18)}
+  h1{margin:0;font-size:22px;color:#4a148c}
+  .sub{margin:2px 0 16px;color:#777;font-size:13px}
+  .row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #eee;font-size:15px;color:#333}
+  .box{margin-top:16px;padding:14px;border-radius:10px;text-align:center}
+  .box.info{background:#ede7f6;color:#4a148c}
+  .box.ok{background:#e8f5e9;color:#1b5e20}
+  .box.err{background:#ffebee;color:#b71c1c}
+  .box.warn{background:#fff3e0;color:#e65100}
+  .bt{font-weight:bold;font-size:16px}
+  .bs{margin-top:6px;font-size:13px;line-height:1.4;word-break:break-word}
+  .btn{display:block;width:100%;margin-top:12px;padding:12px;border:0;border-radius:8px;background:#6a1b9a;color:#fff;font-size:15px;font-weight:bold;text-decoration:none;cursor:pointer}
+  .btn.sec{background:#eee;color:#333}
+</style>
 </head>
 <body>
+<div class="card">
+  <h1>🛒 Manor Mart</h1>
+  <p class="sub">Secure Payment</p>
+  <div class="row"><span>Order</span><b id="oid">-</b></div>
+  <div class="row"><span>Amount to pay</span><b>₹<span id="amt">--</span></b></div>
+  <div id="box" class="box info"></div>
+</div>
 
-    <div class="card">
-        <h2>🛒 Manor Mart Payment</h2>
-        <p style="color: #666; font-size: 13px; margin: 4px 0;">Order Ref: <b id="display-order-id">Loading...</b></p>
-        <div class="amount">₹<span id="display-amount">0.00</span></div>
-        
-        <button id="pay-btn" class="btn-pay" onclick="startPayment()">⚡ Click Here to Pay via UPI / Cards</button>
-        <div id="debug-status" class="live-tag">Server: Ready</div>
-        <div id="status-container" class="status-box"></div>
-    </div>
+<script>
+  var API = 'https://manormart-pay.vercel.app/api';
+  var DB = 'https://manorbiryani-default-rtdb.firebaseio.com/orders';
+  var ID_RE = /^ord_\d{10,16}_\d{1,3}$/;
+  var orderId = new URLSearchParams(location.search).get('order_id') || '';
+  var appLink = 'manormart://success?order_id=' + encodeURIComponent(orderId);
+  var backLink = 'manormart://orders';
+  var paid = false, starting = false;
 
-    <script>
-        const dbUrl = "https://manorbiryani-default-rtdb.firebaseio.com/orders";
-        const urlParams = new URLSearchParams(window.location.search);
-        
-        const amountRupees = urlParams.get('amount') || '10';
-        let orderId = urlParams.get('order_id') || urlParams.get('orderId') || '';
+  function $(id) { return document.getElementById(id); }
 
-        document.getElementById('display-amount').innerText = amountRupees;
-        if (orderId) document.getElementById('display-order-id').innerText = '#' + orderId.slice(-6);
+  // Everything is built with textContent (never innerHTML) so URL data can't inject scripts
+  function show(kind, title, text, buttons) {
+    var box = $('box');
+    box.className = 'box ' + kind;
+    box.textContent = '';
+    var h = document.createElement('div'); h.className = 'bt'; h.textContent = title; box.appendChild(h);
+    if (text) { var p = document.createElement('div'); p.className = 'bs'; p.textContent = text; box.appendChild(p); }
+    (buttons || []).forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button');
+      el.className = 'btn ' + (b.cls || '');
+      el.textContent = b.text;
+      if (b.href) el.href = b.href; else el.onclick = b.onClick;
+      box.appendChild(el);
+    });
+  }
 
-        let paymentProcessed = false;
+  function retryButtons() {
+    return [{ text: 'Try Again', onClick: startPayment }, { text: 'Back to App', href: backLink, cls: 'sec' }];
+  }
 
-        async function markOrderSuccessfulInFirebase(paymentId) {
-            if (!orderId) return false;
-            try {
-                const res = await fetch(dbUrl + "/" + orderId + ".json", {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        deliveryStatus: 'Order Successful', 
-                        razorpayPaymentId: paymentId 
-                    })
-                });
-                return res.ok;
-            } catch (err) { return false; }
+  async function startPayment() {
+    if (paid || starting) return;
+    starting = true;
+
+    if (!ID_RE.test(orderId)) {
+      starting = false;
+      return show('err', 'Invalid payment link', 'Please go back to the Manor Mart app and tap Pay Now again.', [{ text: 'Back to App', href: backLink, cls: 'sec' }]);
+    }
+    $('oid').textContent = '#' + orderId.slice(-6);
+    if (typeof Razorpay === 'undefined') {
+      starting = false;
+      return show('err', 'Payment system not loaded', 'Please check your internet connection and try again.', retryButtons());
+    }
+    show('info', 'Preparing secure payment...', '');
+
+    var info;
+    try {
+      var res = await fetch(API + '/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId })   // amount is NEVER sent: the server calculates it
+      });
+      info = await res.json().catch(function () { return {}; });
+      if (!res.ok || !info.id) throw new Error(info.error || 'Could not start payment. Please try again.');
+    } catch (e) {
+      starting = false;
+      return show('err', 'Payment could not start', e.message, retryButtons());
+    }
+
+    $('amt').textContent = (info.amount / 100).toFixed(2);
+    var rz = new Razorpay({
+      key: info.key,
+      order_id: info.id,
+      amount: info.amount,
+      currency: info.currency || 'INR',
+      name: 'Manor Mart',
+      description: 'Order #' + orderId.slice(-6),
+      theme: { color: '#6a1b9a' },
+      handler: onPaid,
+      modal: {
+        ondismiss: function () {
+          starting = false;
+          if (!paid) show('err', 'Payment cancelled', 'You can try again whenever you are ready.', retryButtons());
         }
+      }
+    });
+    rz.on('payment.failed', function (r) {
+      starting = false;
+      show('err', 'Payment failed', (r && r.error && r.error.description) || 'Please try again.', retryButtons());
+    });
+    show('info', 'Opening secure checkout...', '');
+    rz.open();
+  }
 
-        function showSuccessUI(paymentId) {
-            document.getElementById('pay-btn').style.display = 'none';
-            document.getElementById('debug-status').style.display = 'none';
-            const statusDiv = document.getElementById('status-container');
-            statusDiv.className = 'status-box success-box';
-            statusDiv.style.display = 'block';
-            
-            const redirectUrl = `manormart://success?status=success&razorpay_payment_id=${paymentId}&order_id=${orderId}`;
+  async function onPaid(resp) {
+    paid = true;
+    show('info', 'Payment received', 'Confirming with the server, please wait...');
+    var ok = false;
+    try {
+      var r = await fetch(API + '/verify-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          razorpay_order_id: resp.razorpay_order_id,
+          razorpay_payment_id: resp.razorpay_payment_id,
+          razorpay_signature: resp.razorpay_signature
+        })
+      });
+      ok = r.ok;
+    } catch (e) {}
 
-            statusDiv.innerHTML = `
-                <div style="font-size: 16px;">✅ Payment Successful!</div>
-                <div style="font-size: 11px; margin-top: 4px; color: #555;">Payment ID: ${paymentId}</div>
-                <div style="font-size: 13px; margin-top: 8px; color: #1b5e20;">Order Confirmed! Returning to app...</div>
-                <a href="${redirectUrl}" class="action-btn btn-success">🔙 Open Manor Mart App Now</a>
-            `;
+    // Safety net: the Razorpay webhook may confirm it first
+    for (var i = 0; !ok && i < 10; i++) {
+      await new Promise(function (r) { setTimeout(r, 3000); });
+      try {
+        var v = await (await fetch(DB + '/' + orderId + '/paymentVerified.json')).json();
+        ok = (v === true);
+      } catch (e) {}
+    }
 
-            setTimeout(() => {
-                try {
-                    window.location.href = redirectUrl;
-                } catch(e) {}
-            }, 800);
-        }
+    if (ok) {
+      show('ok', 'Payment successful ✅', 'Payment ID: ' + resp.razorpay_payment_id, [{ text: 'Open Manor Mart App', href: appLink }]);
+      setTimeout(function () { location.href = appLink; }, 1200);
+    } else {
+      show('warn', 'Payment received', 'Confirmation is taking longer than usual. Open the app and tap Check in Orders after a minute. Your payment is safe.', [{ text: 'Open Manor Mart App', href: appLink }]);
+    }
+  }
 
-        function showFailureUI() {
-            document.getElementById('pay-btn').style.display = 'none';
-            const statusDiv = document.getElementById('status-container');
-            statusDiv.className = 'status-box fail-box';
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = `
-                <div style="font-size: 15px;">❌ Payment Cancelled / Incomplete</div>
-                <div style="font-size: 11px; margin-top: 4px; color: #666;">Transaction complete nahi hui.</div>
-                <button onclick="startPayment()" class="action-btn btn-retry">🔄 Retry Payment</button>
-                <a href="manormart://" class="action-btn btn-return">🔙 Return to App</a>
-            `;
-        }
-
-        async function startPayment() {
-            const parsedAmount = Math.round(Number(amountRupees) * 100);
-            const debugEl = document.getElementById('debug-status');
-            
-            if (debugEl) debugEl.innerText = "⏳ Generating Official Razorpay Order...";
-
-            let razorpayOrderId = "";
-
-            try {
-                let res = await fetch('https://manormart-pay.vercel.app/api/create-order', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        amount: amountRupees, 
-                        receipt: orderId ? orderId.slice(-10) : 'ord_' + Date.now() 
-                    })
-                });
-                
-                let orderData = await res.json();
-                
-                if (orderData && orderData.id) {
-                    razorpayOrderId = orderData.id;
-                    if (debugEl) debugEl.innerText = "✅ Order Linked: " + orderData.id;
-                } else {
-                    if (debugEl) debugEl.innerText = "⚠️ Server Issue: " + JSON.stringify(orderData);
-                }
-            } catch (err) {
-                if (debugEl) debugEl.innerText = "⚠️ Connection Issue: " + err.message;
-            }
-
-            var options = {
-                "key": "rzp_live_TeDnM48KoTZovk",
-                "amount": parsedAmount,
-                "currency": "INR",
-                "name": "Manor Mart",
-                "description": "Order " + (orderId ? '#' + orderId.slice(-6) : 'Online'),
-                "order_id": razorpayOrderId,
-                "retry": { "enabled": true },
-                "handler": async function (response) {
-                    paymentProcessed = true;
-                    await markOrderSuccessfulInFirebase(response.razorpay_payment_id);
-                    showSuccessUI(response.razorpay_payment_id);
-                },
-                "modal": {
-                    "ondismiss": function() { 
-                        if (!paymentProcessed) showFailureUI(); 
-                    }
-                },
-                "theme": { "color": "#4a148c" }
-            };
-
-            var rzp1 = new Razorpay(options);
-            rzp1.on('payment.failed', function (response) { 
-                showFailureUI(); 
-            });
-            rzp1.open();
-        }
-
-        window.addEventListener('load', () => {
-            setTimeout(startPayment, 500);
-        });
-    </script>
+  window.addEventListener('load', startPayment);
+</script>
 </body>
 </html>
