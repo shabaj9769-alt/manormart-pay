@@ -1,8 +1,17 @@
 {
   "name": "manormart-pay",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "private": true,
+  "engines": {
+    "node": "22.x"
+  },
   "dependencies": {
     "firebase-admin": "12.7.0"
+  },
+  "overrides": {
+    "jwks-rsa": "3.1.0"
+  },
+  "resolutions": {
+    "jwks-rsa": "3.1.0"
   }
 }
