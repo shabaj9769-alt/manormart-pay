@@ -5,7 +5,7 @@ if (!admin.apps.length) {
   try {
     admin.initializeApp({
       credential: admin.credential.cert(JSON.parse(process.env.FIRE_JSON)),
-      databaseURL: process.env.FIRE__URL
+      databaseURL: process.env.FIREBASE_DATABASE_URL
     });
   } catch (err) {
     console.error('Firebase init error:', err);
