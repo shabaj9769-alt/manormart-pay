@@ -68,12 +68,12 @@ export default async function handler(req, res) {
       if (action === 'createOrder' && orderData) {
         const id = orderData.id || `ord_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
         
-        // Strict default server properties
+        // Strict default server properties with custom status support for online payment
         const secureOrder = {
           ...orderData,
           id: id,
-          deliveryStatus: 'Pending',
-          timestamp: Date.now()
+          deliveryStatus: orderData.deliveryStatus || 'Pending',
+          timestamp: orderData.timestamp || Date.now()
         };
 
         // Agar payment "Online" bheja hai, to bina server payment token ke verify nahi mana jayega
