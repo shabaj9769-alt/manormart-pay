@@ -1,7 +1,7 @@
 // POST { order_id, razorpay_order_id, razorpay_payment_id, razorpay_signature }
 // Verifies Razorpay's signature with the SECRET key, then marks the order paid. Fast path (the webhook is the safety net).
 const crypto = require('crypto');
-const { db, isValidOrderId, cors, parseBody, safeEqual, markPaid } = require('../lib/common');
+const { db, isValidOrderId, cors, parseBody, safeEqual, markPaid, requireCustomerForPhone } = require('../lib/common');
 
 module.exports = async (req, res) => {
   cors(req, res);
@@ -28,6 +28,7 @@ module.exports = async (req, res) => {
     if (!order || order.rzpOrderId !== rzpOrderId || !(Number(order.serverTotal) > 0)) {
       return res.status(400).json({ error: 'Payment does not belong to this order.' });
     }
+    if (!await requireCustomerForPhone(req, res, order.phone)) return;
 
     await markPaid(orderId, paymentId, Number(order.serverTotal));
     return res.status(200).json({ ok: true });
