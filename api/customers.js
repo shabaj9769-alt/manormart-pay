@@ -1,93 +1,52 @@
-import admin from 'firebase-admin';
-
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert(JSON.parse(process.env.FIRE_JSON)),
-      databaseURL: process.env.FIREBASE_DATABASE_URL
-    });
-  } catch (err) {
-    console.error('Firebase init error:', err);
-  }
+const { db, cors, parseBody, verifyFirebaseToken, requireAdmin, safeError, normalizePhone } = require('../lib/common');
+const { verifyCustomerSession, hashPassword, verifyPassword } = require('../lib/customer-auth');
+function phone(p){return normalizePhone(p);}
+async function customerAuth(req, clean){
+  const s=verifyCustomerSession(req); if(s && s.phone===clean) return true;
+  const d = await verifyFirebaseToken(req);
+  if (!d) return false;
+  const candidates = [d.phone_number,d.phone,d.customerPhone].filter(Boolean).map(phone);
+  return candidates.includes(clean);
 }
-
-const db = admin.database();
-
-export default async function handler(req, res) {
-  // CORS setup
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+module.exports=async function(req,res){
+ cors(req,res,'GET,POST,OPTIONS');if(req.method==='OPTIONS')return res.status(204).end();
+ try{
+  if(req.method==='GET'){
+   const clean=phone(req.query?.phone);if(clean.length!==10)return res.status(400).json({error:'Valid 10-digit mobile number required'});
+   if(!await customerAuth(req,clean))return res.status(403).json({error:'Customer authentication required.'});
+   const c=(await db.ref(`customers/${clean}`).once('value')).val()||{};
+   delete c.passwordHash;
+   return res.status(200).json(c);
   }
-
-  // 1. GET Request: Customer apna profile ya addresses load karega
-  if (req.method === 'GET') {
-    const { phone } = req.query;
-    const cleanPhone = (phone || '').replace(/[^0-9]/g, '').trim();
-
-    if (!cleanPhone || cleanPhone.length !== 10) {
-      return res.status(400).json({ error: 'Valid 10-digit mobile number required' });
-    }
-
-    try {
-      const snap = await db.ref(`customers/${cleanPhone}`).once('value');
-      const data = snap.val() || {};
-      return res.status(200).json(data);
-    } catch (e) {
-      return res.status(500).json({ error: 'Failed to fetch customer profile', details: e.message });
-    }
+  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  const body=parseBody(req); const {action,phone:p,name,addr,addresses,token,password,oldPassword}=body;
+  const clean=phone(p);if(clean.length!==10)return res.status(400).json({error:'Valid 10-digit mobile number required'});
+  if(action==='adminSetPassword'){
+    if(!await requireAdmin(req,res))return;
+    if(typeof password!=='string'||password.length<8||password.length>128)return res.status(400).json({error:'Password must be 8-128 characters.'});
+    await db.ref(`customers/${clean}/passwordHash`).set(hashPassword(password));
+    return res.status(200).json({success:true});
   }
-
-  // 2. POST Request: Profile update, address save ya push token update
-  if (req.method === 'POST') {
-    try {
-      const { action, phone, name, addr, addresses, token } = req.body;
-      const cleanPhone = (phone || '').replace(/[^0-9]/g, '').trim();
-
-      if (!cleanPhone || cleanPhone.length !== 10) {
-        return res.status(400).json({ error: 'Valid 10-digit mobile number required' });
-      }
-
-      // Action 1: Customer Profile Details update (Name / Single Addr)
-      if (action === 'updateProfile') {
-        const updateData = {};
-        if (name) updateData.name = name.trim();
-        if (addr) updateData.addr = addr.trim();
-        updateData.updatedAt = Date.now();
-
-        await db.ref(`customers/${cleanPhone}`).update(updateData);
-        return res.status(200).json({ success: true, message: 'Profile updated' });
-      }
-
-      // Action 2: Multiple Saved Addresses list update
-      if (action === 'saveAddresses') {
-        if (!Array.isArray(addresses)) {
-          return res.status(400).json({ error: 'Addresses must be an array' });
-        }
-        await db.ref(`customers/${cleanPhone}/addresses`).set(addresses);
-        return res.status(200).json({ success: true, message: 'Addresses saved' });
-      }
-
-      // Action 3: Customer Push Token save (Notification node)
-      if (action === 'savePushToken' && token) {
-        const tokenKey = 'token_' + cleanPhone;
-        await db.ref(`customerTokens/${tokenKey}`).set({
-          token: token,
-          phone: cleanPhone,
-          updatedAt: Date.now()
-        });
-        return res.status(200).json({ success: true, message: 'Push token registered' });
-      }
-
-      return res.status(400).json({ error: 'Invalid action specified' });
-    } catch (e) {
-      return res.status(500).json({ error: 'Customer update failed', details: e.message });
-    }
+  if(action==='changePassword'){
+    const session=verifyCustomerSession(req);
+    if(!session || session.phone!==clean)return res.status(403).json({error:'Customer authentication required.'});
+    if(typeof password!=='string'||password.length<8||password.length>128)return res.status(400).json({error:'New password must be 8-128 characters.'});
+    const c=(await db.ref(`customers/${clean}`).once('value')).val()||{};
+    const currentPassword=String(oldPassword||'');
+    if(!currentPassword || !c.passwordHash || !verifyPassword(currentPassword,c.passwordHash))return res.status(401).json({error:'Current password is incorrect.'});
+    await db.ref(`customers/${clean}/passwordHash`).set(hashPassword(password));
+    return res.status(200).json({success:true});
   }
-
-  return res.status(405).json({ error: 'Method Not Allowed' });
-}
+  if(!await customerAuth(req,clean))return res.status(403).json({error:'Customer authentication required.'});
+  if(action==='updateProfile'){
+   const u={updatedAt:Date.now()};if(name!==undefined)u.name=String(name).trim().slice(0,120);if(addr!==undefined)u.addr=String(addr).trim().slice(0,1000);
+   await db.ref(`customers/${clean}`).update(u);return res.status(200).json({success:true});
+  }
+  if(action==='saveAddresses'){
+   if(!Array.isArray(addresses)||addresses.length>20)return res.status(400).json({error:'Invalid addresses.'});
+   await db.ref(`customers/${clean}/addresses`).set(addresses);return res.status(200).json({success:true});
+  }
+  if(action==='savePushToken'&&token){const t=String(token).slice(0,4096);await db.ref(`customerTokens/token_${clean}`).set({token:t,phone:clean,updatedAt:Date.now()});return res.status(200).json({success:true});}
+  return res.status(400).json({error:'Invalid action.'});
+ }catch(e){return safeError(res,500,'Customer operation failed.',e);}
+};
