@@ -1,5 +1,5 @@
 // POST { order_id } -> creates a Razorpay order for the amount the SERVER calculates.
-const { db, isValidOrderId, round2, cors, parseBody, rzp, computeServerTotal } = require('../lib/common');
+const { db, isValidOrderId, round2, cors, parseBody, rzp, computeServerTotal, requireCustomerForPhone }  = require('../lib/common');
 
 module.exports = async (req, res) => {
   cors(req, res);
@@ -14,6 +14,7 @@ module.exports = async (req, res) => {
     const ref = db.ref(`orders/${orderId}`);
     const order = (await ref.once('value')).val();
     if (!order) return res.status(404).json({ error: 'Order not found.' });
+    if (!await requireCustomerForPhone(req, res, order.phone)) return;
     if (order.payment !== 'Online') return res.status(400).json({ error: 'This is not an online-payment order.' });
     if (order.paymentVerified === true) return res.status(409).json({ error: 'This order is already paid.' });
     if (!String(order.deliveryStatus || '').includes('Payment Pending')) {
