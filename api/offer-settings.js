@@ -1,0 +1,73 @@
+import admin from 'firebase-admin';
+
+if (!admin.apps.length) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(JSON.parse(process.env.FIRE_JSON)),
+      databaseURL: process.env.FIRE__URL
+    });
+  } catch (err) {
+    console.error('Firebase init error:', err);
+  }
+}
+
+const db = admin.database();
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // 1. GET: Customer App aur Admin App live offer settings read karein
+  if (req.method === 'GET') {
+    try {
+      const snap = await db.ref('offerSettings').once('value');
+      return res.status(200).json(snap.val() || {});
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to fetch offer settings', details: e.message });
+    }
+  }
+
+  // 2. POST: Sirf verified Admin PIN ke saath offer add, edit ya delete ho
+  if (req.method === 'POST') {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.replace('Bearer ', '').trim();
+
+    if (!token || token !== process.env.ADMIN_PIN) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid Admin PIN' });
+    }
+
+    try {
+      const { action, offerData, offerId } = req.body;
+
+      // Pure offerSettings object ko update/replace karna
+      if (action === 'saveAll' && offerData) {
+        await db.ref('offerSettings').set(offerData);
+        return res.status(200).json({ success: true, message: 'Offer settings updated successfully' });
+      }
+
+      // Specific offer banner ya discount setting update karna
+      if (action === 'updateOffer' && offerId && offerData) {
+        await db.ref(`offerSettings/${offerId}`).set(offerData);
+        return res.status(200).json({ success: true, message: 'Offer updated successfully' });
+      }
+
+      // Offer delete karna
+      if (action === 'deleteOffer' && offerId) {
+        await db.ref(`offerSettings/${offerId}`).remove();
+        return res.status(200).json({ success: true, message: 'Offer removed successfully' });
+      }
+
+      return res.status(400).json({ error: 'Invalid action or missing parameters' });
+    } catch (e) {
+      return res.status(500).json({ error: 'Offer settings update failed', details: e.message });
+    }
+  }
+
+  return res.status(405).json({ error: 'Method Not Allowed' });
+}
