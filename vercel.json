@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    { "source": "/api/customer-signup", "destination": "/api/customer" },
+    { "source": "/api/customer-login", "destination": "/api/customer" },
+    { "source": "/api/customers", "destination": "/api/customer" },
+    { "source": "/api/admin-login", "destination": "/api/admin" },
+    { "source": "/api/admin-refresh", "destination": "/api/admin" },
+    { "source": "/api/admin", "destination": "/api/admin" },
+    { "source": "/api/create-order", "destination": "/api/commerce" },
+    { "source": "/api/commerce", "destination": "/api/commerce" },
+    { "source": "/api/orders", "destination": "/api/orders" },
+    { "source": "/api/delivery-areas", "destination": "/api/delivery" },
+    { "source": "/api/delivery-partners", "destination": "/api/delivery" },
+    { "source": "/api/settings", "destination": "/api/store-settings" },
+    { "source": "/api/offer-settings", "destination": "/api/store-settings" },
+    { "source": "/api/verify-payment", "destination": "/api/payments" },
+    { "source": "/api/payment-status", "destination": "/api/payments" },
+    { "source": "/api/razorpay-webhook", "destination": "/api/payments" }
+  ]
+}
