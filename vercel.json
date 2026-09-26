@@ -1,22 +1,17 @@
 {
   "rewrites": [
-    { "source": "/api/catalog", "destination": "/api/commerce" },
-    { "source": "/api/orders-manager", "destination": "/api/orders" },
-    { "source": "/api/customer-signup", "destination": "/api/customer" },
-    { "source": "/api/customer-login", "destination": "/api/customer" },
-    { "source": "/api/customers", "destination": "/api/customer" },
-    { "source": "/api/admin-login", "destination": "/api/admin" },
-    { "source": "/api/admin-refresh", "destination": "/api/admin" },
-    { "source": "/api/admin", "destination": "/api/admin" },
-    { "source": "/api/create-order", "destination": "/api/commerce" },
-    { "source": "/api/commerce", "destination": "/api/commerce" },
-    { "source": "/api/orders", "destination": "/api/orders" },
-    { "source": "/api/delivery-areas", "destination": "/api/delivery" },
-    { "source": "/api/delivery-partners", "destination": "/api/delivery" },
-    { "source": "/api/settings", "destination": "/api/store-settings" },
-    { "source": "/api/offer-settings", "destination": "/api/store-settings" },
-    { "source": "/api/verify-payment", "destination": "/api/payments" },
-    { "source": "/api/payment-status", "destination": "/api/payments" },
-    { "source": "/api/razorpay-webhook", "destination": "/api/payments" }
+    { "source": "/api/admin-login", "destination": "/api/admin?route=login" },
+    { "source": "/api/admin-refresh", "destination": "/api/admin?route=refresh" },
+    { "source": "/api/catalog", "destination": "/api/commerce?route=catalog" },
+    { "source": "/api/create-order", "destination": "/api/commerce?route=create-order" },
+    { "source": "/api/customer-login", "destination": "/api/customer?route=login" },
+    { "source": "/api/customer-signup", "destination": "/api/customer?route=signup" },
+    { "source": "/api/customers", "destination": "/api/customer?route=profile" },
+    { "source": "/api/delivery-areas", "destination": "/api/delivery?route=areas" },
+    { "source": "/api/delivery-partners", "destination": "/api/delivery?route=partners" },
+    { "source": "/api/verify-payment", "destination": "/api/payments?route=verify" },
+    { "source": "/api/payment-status", "destination": "/api/payments?route=status" },
+    { "source": "/api/settings", "destination": "/api/store-settings?route=settings" },
+    { "source": "/api/offer-settings", "destination": "/api/store-settings?route=offer" }
   ]
 }
