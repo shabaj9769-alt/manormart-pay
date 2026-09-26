@@ -113,4 +113,11 @@ async function createOrder(req, res) {
   }
 }
 
-module.exports = { catalog, createOrder };
+// Vercel compatible router export handler
+module.exports = async function handler(req, res) {
+  const url = req.url || '';
+  if (url.includes('create-order')) {
+    return createOrder(req, res);
+  }
+  return catalog(req, res);
+};
