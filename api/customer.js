@@ -14,6 +14,7 @@ const {
 const {
   loginCustomer,
   verifyCustomerSession,
+  createCustomerSession,
   hashPassword,
   verifyPassword,
 } = require('../lib/customer-auth');
@@ -51,6 +52,52 @@ async function customerLogin(req, res) {
     return res.status(200).json({ token: result.token, customer: result.customer });
   } catch (e) {
     return safeError(res, 500, 'Login failed. Please try again.', e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// customerSignup
+// POST { phone, password, name?, addr? } -> creates a password for a
+// customer number that doesn't have one yet, and returns a signed session
+// token (same shape as customerLogin). Refuses to touch a number that
+// already has a password — that number must use customerLogin or
+// changePassword instead.
+// ---------------------------------------------------------------------------
+
+async function customerSignup(req, res) {
+  cors(req, res, 'POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const body = parseBody(req);
+    const clean = phone(body.phone);
+    const password = String(body.password || '');
+
+    if (clean.length !== 10) return res.status(400).json({ error: 'Valid 10-digit mobile number required.' });
+    if (password.length < 8 || password.length > 128) return res.status(400).json({ error: 'Password must be 8-128 characters.' });
+
+    const ref = db.ref(`customers/${clean}`);
+    const existing = (await ref.once('value')).val() || {};
+    if (existing.passwordHash) {
+      return res.status(409).json({ error: 'An account already exists for this number. Please log in instead.' });
+    }
+
+    const u = { passwordHash: hashPassword(password), updatedAt: Date.now() };
+    if (!existing.createdAt) u.createdAt = Date.now();
+    if (body.name !== undefined) u.name = String(body.name).trim().slice(0, 120);
+    if (body.addr !== undefined) u.addr = String(body.addr).trim().slice(0, 1000);
+
+    await ref.update(u);
+
+    const customer = {
+      name: u.name !== undefined ? u.name : (existing.name || ''),
+      addr: u.addr !== undefined ? u.addr : (existing.addr || ''),
+      addresses: Array.isArray(existing.addresses) ? existing.addresses : [],
+    };
+    return res.status(200).json({ token: createCustomerSession(clean), customer });
+  } catch (e) {
+    return safeError(res, 500, 'Signup failed. Please try again.', e);
   }
 }
 
@@ -129,4 +176,4 @@ async function customerProfile(req, res) {
   }
 }
 
-module.exports = { customerLogin, customerProfile };
+module.exports = { customerLogin, customerSignup, customerProfile };
