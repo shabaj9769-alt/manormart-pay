@@ -1,0 +1,241 @@
+// Combined admin handlers: adminLogin, adminRefresh, adminDb.
+// Originally three separate Vercel routes (admin-login.js, admin-refresh.js,
+// admin-db.js). You are responsible for wiring these to their routes/methods
+// in your own router — they are no longer auto-routed by filename.
+const crypto = require('crypto');
+const admin = require('firebase-admin');
+const {
+  db,
+  cors,
+  parseBody,
+  requireAdmin,
+  safeError,
+} = require('../lib/common'); // also initialises firebase-admin
+
+// ---------------------------------------------------------------------------
+// adminLogin
+// POST { pin } -> checks the admin PIN ON THE SERVER (ADMIN_PIN env var) and
+// returns a 1-hour Firebase token that carries the custom claim admin: true
+// (Firebase rules can then allow writes only for the admin).
+// ---------------------------------------------------------------------------
+
+const LOGIN_WINDOW_MS = 15 * 60 * 1000; // lock window
+const LOGIN_MAX_PER_IP = 5;             // wrong PINs per IP per window
+const LOGIN_MAX_GLOBAL = 100;           // wrong PINs from everyone per window (stops distributed guessing)
+
+function ipKey(req) {
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+    || (req.socket && req.socket.remoteAddress) || 'unknown';
+  return 'ip_' + crypto.createHash('sha256').update(ip).digest('hex').slice(0, 24);
+}
+
+const sameSecret = (a, b) => {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+};
+
+async function msLeft(path, max) {
+  const cur = (await db.ref(path).once('value')).val();
+  if (!cur || Date.now() - cur.start > LOGIN_WINDOW_MS || cur.fails < max) return 0;
+  return cur.start + LOGIN_WINDOW_MS - Date.now();
+}
+
+async function recordFail(path) {
+  await db.ref(path).transaction((cur) => {
+    const now = Date.now();
+    if (!cur || now - cur.start > LOGIN_WINDOW_MS) return { fails: 1, start: now };
+    return { fails: cur.fails + 1, start: cur.start };
+  });
+}
+
+async function adminLogin(req, res) {
+  cors(req, res, 'POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  if (!process.env.ADMIN_PIN || !process.env.FIREBASE_WEB_API_KEY) {
+    console.error('adminLogin: ADMIN_PIN or FIREBASE_WEB_API_KEY env variable is missing');
+    return res.status(500).json({ error: 'Server is not configured yet.' });
+  }
+
+  try {
+    const pin = String(parseBody(req).pin || '').trim();
+    if (!/^[A-Za-z0-9]{4,32}$/.test(pin)) return res.status(400).json({ error: 'Enter your PIN.' });
+
+    const ipPath = `adminLogin/${ipKey(req)}`;
+    const wait = Math.max(await msLeft(ipPath, LOGIN_MAX_PER_IP), await msLeft('adminLogin/global', LOGIN_MAX_GLOBAL));
+    if (wait > 0) {
+      return res.status(429).json({ error: `Too many wrong attempts. Try again in ${Math.ceil(wait / 60000)} minute(s).` });
+    }
+
+    if (!sameSecret(pin, process.env.ADMIN_PIN)) {
+      await Promise.all([recordFail(ipPath), recordFail('adminLogin/global')]);
+      return res.status(401).json({ error: 'Incorrect Admin Security PIN!' });
+    }
+
+    await db.ref(ipPath).remove(); // correct PIN: reset this device's counter
+
+    const customToken = await admin.auth().createCustomToken('manormart-admin', { admin: true });
+    const r = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${process.env.FIREBASE_WEB_API_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: customToken, returnSecureToken: true }) }
+    );
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.idToken) {
+      console.error('adminLogin: token exchange failed:', r.status, JSON.stringify(d.error || d));
+      return res.status(500).json({ error: 'Login service error. Please try again.' });
+    }
+    return res.status(200).json({ idToken: d.idToken, refreshToken: d.refreshToken, expiresIn: Number(d.expiresIn) || 3600 });
+  } catch (e) {
+    console.error('adminLogin error:', e);
+    return res.status(500).json({ error: 'Server error. Please try again.' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// adminRefresh
+// POST { refreshToken } -> a fresh 1-hour Firebase token (keeps the admin
+// session alive without asking for the PIN again). The "admin" claim travels
+// with the refresh token, so this endpoint cannot give admin rights to anyone
+// else.
+// ---------------------------------------------------------------------------
+
+async function adminRefresh(req, res) {
+  cors(req, res, 'POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!process.env.FIREBASE_WEB_API_KEY) return res.status(500).json({ error: 'Server is not configured yet.' });
+
+  try {
+    const refreshToken = String(parseBody(req).refreshToken || '');
+    if (refreshToken.length < 20 || refreshToken.length > 2000) return res.status(400).json({ error: 'Invalid token.' });
+
+    const r = await fetch(`https://securetoken.googleapis.com/v1/token?key=${process.env.FIREBASE_WEB_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.id_token) return res.status(401).json({ error: 'Session expired.' });
+    return res.status(200).json({ idToken: d.id_token, refreshToken: d.refresh_token, expiresIn: Number(d.expires_in) || 3600 });
+  } catch (e) {
+    console.error('adminRefresh error:', e);
+    return res.status(500).json({ error: 'Server error.' });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// adminDb
+// GET/PUT/PATCH/DELETE ?path=<firebase/db/path>.json
+//
+// This is the endpoint the admin app's `authFetch(ADMIN_DB_PREFIX + ...)`
+// helper calls for every read/write it does (settings, categories/menu,
+// deliveryBoys, orders, deliveryBoySecrets, customerTokens, ...).
+//
+// It mirrors the shape of Firebase's own REST Database API (`<path>.json`,
+// GET/PUT/PATCH/DELETE) but requires a valid admin session token, so the app
+// never needs its own direct Firebase credentials.
+//
+// NOTE: this handler needs the raw request body (to preserve non-object JSON
+// values like a bare string/boolean/null for PUT), so whatever router you
+// wire this into must disable body parsing for this route
+// (Vercel: module.exports.config = { api: { bodyParser: false } };).
+// ---------------------------------------------------------------------------
+
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => { data += chunk; });
+    req.on('end', () => resolve(data));
+    req.on('error', reject);
+  });
+}
+
+// Firebase Realtime Database keys can't contain these characters.
+const FORBIDDEN_KEY_CHARS = /[.#$[\]]/;
+
+// Customer records (and their password hashes) are managed exclusively through
+// the customer handlers, which know how to hash/verify passwords correctly.
+// Block this generic proxy from touching that subtree so a bug here can never
+// write a customer's password in plain text.
+const BLOCKED_ROOTS = new Set(['customers']);
+
+// The client builds paths like "categories/Dairy%20Products/prodId/status.json"
+// (already URL-encoded once by the app for the category name) and then the
+// whole thing gets encodeURIComponent'd again to go in the query string. By the
+// time it reaches req.query.path, the outer encoding has been undone by the
+// normal query-string parser, so each path segment still needs its own
+// decodeURIComponent to recover things like spaces in category names.
+function sanitizePath(rawPath) {
+  if (typeof rawPath !== 'string') return null;
+  let p = rawPath.trim();
+  if (!p) return null;
+  if (p.startsWith('/')) p = p.slice(1);
+  if (p.toLowerCase().endsWith('.json')) p = p.slice(0, -5);
+  if (!p) return null;
+
+  const segments = p.split('/').filter(Boolean);
+  if (!segments.length) return null;
+
+  const decoded = [];
+  for (const seg of segments) {
+    let d;
+    try { d = decodeURIComponent(seg); } catch { return null; }
+    if (!d || d === '.' || d === '..' || FORBIDDEN_KEY_CHARS.test(d)) return null;
+    decoded.push(d);
+  }
+  if (BLOCKED_ROOTS.has(decoded[0])) return null;
+  return decoded.join('/');
+}
+
+async function adminDb(req, res) {
+  cors(req, res, 'GET,PUT,PATCH,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  try {
+    if (!await requireAdmin(req, res)) return;
+
+    const rawPath = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path;
+    const path = sanitizePath(rawPath);
+    if (!path) return res.status(400).json({ error: 'Invalid or missing path.' });
+
+    const ref = db.ref(path);
+
+    if (req.method === 'GET') {
+      const val = (await ref.once('value')).val();
+      return res.status(200).json(val === undefined ? null : val);
+    }
+
+    if (req.method === 'DELETE') {
+      await ref.remove();
+      return res.status(200).json({ success: true });
+    }
+
+    if (req.method === 'PUT' || req.method === 'PATCH') {
+      const raw = await getRawBody(req);
+      let value;
+      try { value = raw.length ? JSON.parse(raw) : null; }
+      catch { return res.status(400).json({ error: 'Invalid JSON body.' }); }
+
+      if (req.method === 'PUT') {
+        await ref.set(value);
+      } else {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          return res.status(400).json({ error: 'PATCH body must be a JSON object.' });
+        }
+        await ref.update(value);
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (e) {
+    return safeError(res, 500, 'Database operation failed.', e);
+  }
+}
+// Carried over for reference — apply wherever your router disables body
+// parsing for this handler.
+adminDb.needsRawBody = true;
+
+module.exports = { adminLogin, adminRefresh, adminDb };
