@@ -1,4 +1,4 @@
-// Combined commerce handlers: catalog, Razorpay createOrder, and customer orders.
+// Combined commerce handlers: catalog, createOrder (Razorpay), and customer orders.
 const {
   db,
   cors,
@@ -11,12 +11,9 @@ const {
   computeServerTotal,
   requireCustomerForPhone,
 } = require('../lib/common');
-const { verifyCustomerSession } = require('../lib/customer-auth');
 
 // ---------------------------------------------------------------------------
 // 1. catalog
-// GET -> full categories/products tree
-// POST { action, catName, prodId, data } -> admin-only product/category edits
 // ---------------------------------------------------------------------------
 async function catalog(req, res) {
   cors(req, res, 'GET,POST,OPTIONS');
@@ -37,7 +34,7 @@ async function catalog(req, res) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. createOrder (Razorpay - Your original secure payment order code)[span_3](start_span)[span_3](end_span)
+// 2. createOrder (Razorpay)
 // ---------------------------------------------------------------------------
 async function createOrder(req, res) {
   cors(req, res);
@@ -106,7 +103,7 @@ async function createOrder(req, res) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. handleCustomerOrders (NEW: Create Order, Fetch by Phone, Cancel Order)
+// 3. handleCustomerOrders (Using requireCustomerForPhone for security)
 // ---------------------------------------------------------------------------
 async function handleCustomerOrders(req, res) {
   cors(req, res, 'GET,POST,OPTIONS');
@@ -129,10 +126,7 @@ async function handleCustomerOrders(req, res) {
         const cleanPh = String(phone).replace(/[^0-9]/g, '').trim();
         if (cleanPh.length !== 10) return res.status(400).json({ error: 'Valid 10-digit phone required.' });
         
-        const session = verifyCustomerSession(req);
-        if (!session || session.phone !== cleanPh) {
-          return res.status(403).json({ error: 'Customer authentication required.' });
-        }
+        if (!await requireCustomerForPhone(req, res, cleanPh)) return;
 
         const snap = await db.ref('orders').orderByChild('phone').equalTo(cleanPh).once('value');
         return res.status(200).json(snap.val() || {});
@@ -152,10 +146,7 @@ async function handleCustomerOrders(req, res) {
         const custPhone = String(orderData.phone || '').trim();
         if (custPhone.length !== 10) return res.status(400).json({ error: 'Valid customer phone required.' });
 
-        const session = verifyCustomerSession(req);
-        if (!session || session.phone !== custPhone) {
-          return res.status(403).json({ error: 'Customer authentication required.' });
-        }
+        if (!await requireCustomerForPhone(req, res, custPhone)) return;
 
         await db.ref(`orders/${orderData.id}`).set({
           ...orderData,
@@ -197,7 +188,7 @@ async function handleCustomerOrders(req, res) {
 }
 
 // ---------------------------------------------------------------------------
-// Vercel compatible router export handler[span_4](start_span)[span_4](end_span)
+// Vercel compatible router export handler[span_1](start_span)[span_1](end_span)
 // ---------------------------------------------------------------------------
 module.exports = async function handler(req, res) {
   const url = req.url || '';
