@@ -16,9 +16,6 @@ const {
 
 // ---------------------------------------------------------------------------
 // verifyPayment
-// POST { order_id, razorpay_order_id, razorpay_payment_id, razorpay_signature }
-// Verifies Razorpay's signature with the SECRET key, then marks the order
-// paid. Fast path (razorpayWebhook below is the safety net).
 // ---------------------------------------------------------------------------
 
 async function verifyPayment(req, res) {
@@ -58,13 +55,6 @@ async function verifyPayment(req, res) {
 
 // ---------------------------------------------------------------------------
 // paymentStatus
-// GET ?orderId=ord_... -> { paymentVerified: boolean }
-// Used only by the payment-confirmation page (index.html) as a safety-net
-// poll while it waits for razorpayWebhook to land. Deliberately
-// unauthenticated (the checkout page has no customer session token), but it
-// only ever reveals one boolean for one order the caller already knows the
-// exact id of - it does not leak the rest of the order (name, phone, address,
-// items).
 // ---------------------------------------------------------------------------
 
 async function paymentStatus(req, res) {
@@ -85,13 +75,6 @@ async function paymentStatus(req, res) {
 
 // ---------------------------------------------------------------------------
 // razorpayWebhook
-// Razorpay -> your server. Confirms payments even if the customer closes the
-// browser mid-way.
-//
-// NOTE: this handler needs the raw request body for the signature check, so
-// whatever router you wire this into must disable body parsing for this
-// route (Vercel: module.exports.config = { api: { bodyParser: false } };).
-// It also has no CORS handling by design — Razorpay calls it server-to-server.
 // ---------------------------------------------------------------------------
 
 function getRawBody(req) {
@@ -107,7 +90,7 @@ async function razorpayWebhook(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const raw = await getRawBody(req); // signature must be checked on the RAW body
+    const raw = await getRawBody(req);
     const sig = req.headers['x-razorpay-signature'];
     const expected = crypto.createHmac('sha256', process.env.RZP_WEBHOOK_SECRET).update(raw).digest('hex');
     if (!sig || !safeEqual(sig, expected)) return res.status(400).send('bad signature');
@@ -132,11 +115,22 @@ async function razorpayWebhook(req, res) {
     return res.status(200).send('ok');
   } catch (e) {
     console.error('razorpayWebhook error:', e);
-    return res.status(500).send('error'); // Razorpay will retry
+    return res.status(500).send('error');
   }
 }
-// Carried over for reference — apply wherever your router disables body
-// parsing for this handler.
 razorpayWebhook.needsRawBody = true;
 
-module.exports = { verifyPayment, paymentStatus, razorpayWebhook };
+// Vercel compatible router export handler
+module.exports = async function handler(req, res) {
+  const url = req.url || '';
+  if (url.includes('verify')) {
+    return verifyPayment(req, res);
+  }
+  if (url.includes('status')) {
+    return paymentStatus(req, res);
+  }
+  if (url.includes('webhook')) {
+    return razorpayWebhook(req, res);
+  }
+  return verifyPayment(req, res);
+};
