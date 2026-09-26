@@ -54,4 +54,11 @@ async function offerSettings(req, res) {
   } catch (e) { return safeError(res, 500, 'Offer operation failed.', e); }
 }
 
-module.exports = { settings, offerSettings };
+// Vercel compatible router export handler
+module.exports = async function handler(req, res) {
+  const url = req.url || '';
+  if (url.includes('offer')) {
+    return offerSettings(req, res);
+  }
+  return settings(req, res);
+};
