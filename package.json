@@ -3,7 +3,7 @@
   "version": "2.0.1",
   "private": true,
   "engines": {
-    "node": "22.x"
+    "node": "20.x"
   },
   "dependencies": {
     "firebase-admin": "12.7.0"
