@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/orders-manager", "destination": "/api/orders" },
     { "source": "/api/customer-signup", "destination": "/api/customer" },
     { "source": "/api/customer-login", "destination": "/api/customer" },
     { "source": "/api/customers", "destination": "/api/customer" },
