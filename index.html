@@ -37,6 +37,7 @@
   var DB = 'https://manorbiryani-default-rtdb.firebaseio.com/orders';
   var ID_RE = /^ord_\d{10,16}_\d{1,3}$/;
   var orderId = new URLSearchParams(location.search).get('order_id') || '';
+  var customerToken = new URLSearchParams(location.search).get('token') || '';
   var appLink = 'manormart://success?order_id=' + encodeURIComponent(orderId);
   var backLink = 'manormart://orders';
   var paid = false, starting = false;
@@ -80,9 +81,11 @@
 
     var info;
     try {
+      var headers = { 'Content-Type': 'application/json' };
+      if (customerToken) headers['Authorization'] = 'Bearer ' + customerToken;
       var res = await fetch(API + '/create-order', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: JSON.stringify({ order_id: orderId })   // amount is NEVER sent: the server calculates it
       });
       info = await res.json().catch(function () { return {}; });
@@ -122,9 +125,11 @@
     show('info', 'Payment received', 'Confirming with the server, please wait...');
     var ok = false;
     try {
+      var vHeaders = { 'Content-Type': 'application/json' };
+      if (customerToken) vHeaders['Authorization'] = 'Bearer ' + customerToken;
       var r = await fetch(API + '/verify-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: vHeaders,
         body: JSON.stringify({
           order_id: orderId,
           razorpay_order_id: resp.razorpay_order_id,
