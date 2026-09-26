@@ -66,10 +66,6 @@ async function deliveryPartners(req, res) {
         console.error('deliveryPartners: FIREBASE_WEB_API_KEY env variable is missing');
         return res.status(500).json({ error: 'Server is not configured yet.' });
       }
-      // A Firebase custom token (from createCustomToken) can't be checked with
-      // verifyIdToken - it has to be exchanged for a real ID token first, the
-      // same way adminLogin does it. Returning the raw custom token meant every
-      // delivery-boy-authenticated request (like updateBoyPushToken) would fail.
       let idToken = null, refreshToken = null;
       try {
         const customToken = await admin.auth().createCustomToken(`delivery-${key}`, { deliveryBoy: true, boyKey: key });
@@ -97,4 +93,11 @@ async function deliveryPartners(req, res) {
   } catch (e) { return safeError(res, 500, 'Delivery-partner operation failed.', e); }
 }
 
-module.exports = { deliveryAreas, deliveryPartners };
+// Vercel compatible router export handler
+module.exports = async function handler(req, res) {
+  const url = req.url || '';
+  if (url.includes('partners')) {
+    return deliveryPartners(req, res);
+  }
+  return deliveryAreas(req, res);
+};
