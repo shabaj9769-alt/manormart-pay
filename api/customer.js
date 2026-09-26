@@ -1,7 +1,6 @@
-// Combined customer handlers: customerLogin, customerProfile.
-// Originally two separate Vercel routes (customer-login.js, customers.js).
-// You are responsible for wiring these to their routes/methods in your own
-// router — they are no longer auto-routed by filename.
+// Combined customer handlers: customerLogin, customerSignup, customerProfile.
+// Originally separate Vercel routes. You are responsible for wiring these to their routes/methods
+// in your own router — they are no longer auto-routed by filename.
 const {
   db,
   cors,
@@ -23,9 +22,6 @@ function phone(p) { return normalizePhone(p); }
 
 // ---------------------------------------------------------------------------
 // customerLogin
-// POST { phone, password } -> verifies the customer's password (set by admin
-// via customerProfile action=adminSetPassword, or changed by the customer via
-// action=changePassword) and returns a signed customer session token.
 // ---------------------------------------------------------------------------
 
 async function customerLogin(req, res) {
@@ -57,11 +53,6 @@ async function customerLogin(req, res) {
 
 // ---------------------------------------------------------------------------
 // customerSignup
-// POST { phone, password, name?, addr? } -> creates a password for a
-// customer number that doesn't have one yet, and returns a signed session
-// token (same shape as customerLogin). Refuses to touch a number that
-// already has a password — that number must use customerLogin or
-// changePassword instead.
 // ---------------------------------------------------------------------------
 
 async function customerSignup(req, res) {
@@ -103,8 +94,6 @@ async function customerSignup(req, res) {
 
 // ---------------------------------------------------------------------------
 // customerProfile
-// GET ?phone=<10-digit> -> customer record (password hash stripped)
-// POST { action, phone, ... } -> profile/address/password/push-token actions
 // ---------------------------------------------------------------------------
 
 async function customerAuth(req, clean) {
@@ -176,4 +165,14 @@ async function customerProfile(req, res) {
   }
 }
 
-module.exports = { customerLogin, customerSignup, customerProfile };
+// Vercel compatible router export handler
+module.exports = async function handler(req, res) {
+  const url = req.url || '';
+  if (url.includes('signup')) {
+    return customerSignup(req, res);
+  }
+  if (url.includes('login')) {
+    return customerLogin(req, res);
+  }
+  return customerProfile(req, res);
+};
