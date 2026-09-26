@@ -1,108 +1,103 @@
-// ordersManager
-// Originally its own Vercel route (orders-manager.js). You are responsible
-// for wiring this to its route/methods in your own router.
-//
-// GET  ?phone=... / ?orderId=...  -> customer's own orders, or (with an admin
-//      token) any order / the full orders tree.
-// POST { action, ... } -> createOrder, cancelCustomerOrder (customer-facing),
-//      and updateStatus / assignBoy / cancelOrder / deleteOrder (admin-only).
-const {
-  db,
-  admin,
-  cors,
-  parseBody,
-  requireAdmin,
-  verifyFirebaseToken,
-  requireCustomerForPhone,
-  isValidOrderId,
-  computeServerTotal,
-  safeError,
-  normalizePhone,
-} = require('../lib/common');
-const { verifyCustomerSession } = require('../lib/customer-auth');
-const crypto = require('crypto');
+// Combined delivery handlers: deliveryAreas, deliveryPartners.
+// Originally two separate Vercel routes (delivery-areas.js,
+// delivery-partners.js). You are responsible for wiring these to their
+// routes/methods in your own router.
+const { db, admin, cors, parseBody, requireAdmin, safeError } = require('../lib/common');
 
-function newId() { return `ord_${Date.now()}_${crypto.randomInt(0, 1000)}`; }
-function cleanPhone(p) { return String(p || '').replace(/[^0-9]/g, '').trim(); }
-async function isAdminToken(req) { const d = await verifyFirebaseToken(req); return !!(d && d.admin === true); }
+// ---------------------------------------------------------------------------
+// deliveryAreas
+// GET -> full deliveryAreas tree
+// POST { action, areaId, areaData, allAreas } -> admin-only area edits
+// ---------------------------------------------------------------------------
 
-async function ordersManager(req, res) {
+async function deliveryAreas(req, res) {
+  cors(req, res, 'GET,POST,OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  try {
+    if (req.method === 'GET') return res.status(200).json((await db.ref('deliveryAreas').once('value')).val() || {});
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    if (!await requireAdmin(req, res)) return;
+    const { action, areaId, areaData, allAreas } = parseBody(req);
+    if (action === 'saveAll' && allAreas && typeof allAreas === 'object') { await db.ref('deliveryAreas').set(allAreas); return res.status(200).json({ success: true, message: 'All delivery areas updated' }); }
+    if (action === 'updateArea' && areaId && areaData && typeof areaData === 'object') { await db.ref(`deliveryAreas/${String(areaId).replace(/[.#$\[\]/]/g, '')}`).set(areaData); return res.status(200).json({ success: true, message: 'Area updated successfully' }); }
+    if (action === 'deleteArea' && areaId) { await db.ref(`deliveryAreas/${String(areaId).replace(/[.#$\[\]/]/g, '')}`).remove(); return res.status(200).json({ success: true, message: 'Area deleted successfully' }); }
+    return res.status(400).json({ error: 'Invalid action or data.' });
+  } catch (e) { return safeError(res, 500, 'Delivery-area operation failed.', e); }
+}
+
+// ---------------------------------------------------------------------------
+// deliveryPartners
+// GET -> admin-only list of delivery boys (secretCode stripped)
+// POST { action, ... } -> boyLogin (public), updateBoyPushToken
+//      (delivery-boy session), saveBoy / deleteBoy (admin-only)
+// ---------------------------------------------------------------------------
+
+async function requireDeliveryBoy(req, res, boyId) {
+  const token = String(req.headers.authorization || '').replace(/^Bearer\s+/, '').trim();
+  if (!token) { res.status(401).json({ error: 'Unauthorized.' }); return null; }
+  try {
+    const d = await admin.auth().verifyIdToken(token, true);
+    if (d.deliveryBoy !== true || String(d.boyKey) !== String(boyId)) { res.status(403).json({ error: 'Forbidden.' }); return null; }
+    return d;
+  } catch { res.status(401).json({ error: 'Invalid session.' }); return null; }
+}
+
+async function deliveryPartners(req, res) {
   cors(req, res, 'GET,POST,OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();
   try {
     if (req.method === 'GET') {
-      const { phone, orderId } = req.query || {};
-      const adminToken = await isAdminToken(req);
-      if (adminToken) {
-        if (orderId) {
-          if (!isValidOrderId(String(orderId))) return res.status(400).json({ error: 'Invalid order id.' });
-          return res.status(200).json((await db.ref(`orders/${orderId}`).once('value')).val() || {});
-        }
-        return res.status(200).json((await db.ref('orders').once('value')).val() || {});
-      }
-      const session = verifyCustomerSession(req);
-      const decoded = session || await verifyFirebaseToken(req);
-      if (!decoded) return res.status(401).json({ error: 'Customer authentication required.' });
-      const ownPhones = session ? [session.phone] : [decoded.phone_number, decoded.phone, decoded.customerPhone].filter(Boolean).map(cleanPhone);
-      if (phone) {
-        const p = cleanPhone(phone);
-        if (p.length !== 10) return res.status(400).json({ error: 'Valid mobile number required' });
-        if (!ownPhones.includes(p)) return res.status(403).json({ error: 'You can only access your own orders.' });
-        const snap = await db.ref('orders').orderByChild('phone').equalTo(p).once('value');
-        return res.status(200).json(snap.val() || {});
-      }
-      if (orderId) {
-        if (!isValidOrderId(String(orderId))) return res.status(400).json({ error: 'Invalid order id.' });
-        const order = (await db.ref(`orders/${orderId}`).once('value')).val() || {};
-        if (!ownPhones.includes(cleanPhone(order.phone))) return res.status(403).json({ error: 'You can only access your own order.' });
-        return res.status(200).json(order);
-      }
-      return res.status(400).json({ error: 'Phone or orderId required.' });
+      if (!await requireAdmin(req, res)) return;
+      const boys = (await db.ref('deliveryBoys').once('value')).val() || {};
+      const out = {};
+      for (const [k, v] of Object.entries(boys)) { const { secretCode, ...safe } = v || {}; out[k] = safe; }
+      return res.status(200).json(out);
     }
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const { action, orderId, orderData, status, assignedBoy, boyPhone } = parseBody(req);
-
-    if (action === 'cancelCustomerOrder') {
-      const id = String(orderId || '');
-      if (!isValidOrderId(id)) return res.status(400).json({ error: 'Invalid order id.' });
-      const session = verifyCustomerSession(req);
-      if (!session) return res.status(401).json({ error: 'Customer authentication required.' });
-      const ref = db.ref(`orders/${id}`);
-      const snap = await ref.once('value');
-      const cur = snap.val();
-      if (!cur || cleanPhone(cur.phone) !== session.phone) return res.status(403).json({ error: 'You can only cancel your own order.' });
-      const st = String(cur.deliveryStatus || '');
-      if (st === 'Delivered' || st === 'Out for Delivery' || st.includes('Cancelled')) return res.status(409).json({ error: 'This order can no longer be cancelled.' });
-      const next = cur.payment === 'Online' && cur.paymentVerified === true ? '❌ Cancelled (Paid - Refundable)' : (cur.payment === 'Online' ? '❌ Cancelled (Unpaid)' : '❌ Order Cancelled (COD)');
-      await ref.update({ deliveryStatus: next, cancelledAt: Date.now(), updatedAt: Date.now(), ...(cur.payment === 'Online' && cur.paymentVerified === true ? { needsRefund: true } : {}) });
+    const { action, boyId, phone, secretCode, pushToken, boyData } = parseBody(req);
+    if (action === 'boyLogin') {
+      if (!phone || !secretCode) return res.status(400).json({ error: 'Phone and secret code required' });
+      const boys = (await db.ref('deliveryBoys').once('value')).val() || {};
+      const pair = Object.entries(boys).find(([, b]) => String(b?.phone || '').trim() === String(phone).trim() && String(b?.secretCode || '').trim() === String(secretCode).trim());
+      if (!pair) return res.status(401).json({ error: 'Invalid phone number or secret code' });
+      const [key, boy] = pair;
+      const { secretCode: _, ...safeBoyData } = boy;
+      if (!process.env.FIREBASE_WEB_API_KEY) {
+        console.error('deliveryPartners: FIREBASE_WEB_API_KEY env variable is missing');
+        return res.status(500).json({ error: 'Server is not configured yet.' });
+      }
+      let idToken = null, refreshToken = null;
+      try {
+        const customToken = await admin.auth().createCustomToken(`delivery-${key}`, { deliveryBoy: true, boyKey: key });
+        const r = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${process.env.FIREBASE_WEB_API_KEY}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: customToken, returnSecureToken: true }) }
+        );
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.idToken) { idToken = d.idToken; refreshToken = d.refreshToken || null; }
+        else console.error('deliveryPartners: token exchange failed:', r.status, JSON.stringify(d.error || d));
+      } catch (e) { console.error('deliveryPartners: delivery token error', e); }
+      if (!idToken) return res.status(500).json({ error: 'Login service error. Please try again.' });
+      return res.status(200).json({ success: true, boyKey: key, boy: safeBoyData, idToken, refreshToken });
+    }
+    if (action === 'updateBoyPushToken' && boyId && pushToken) {
+      const decoded = await requireDeliveryBoy(req, res, boyId);
+      if (!decoded) return;
+      await db.ref(`deliveryBoys/${boyId}/pushToken`).set(String(pushToken).slice(0, 4096));
       return res.status(200).json({ success: true });
     }
-
-    if (action === 'createOrder' && orderData) {
-      const id = isValidOrderId(String(orderData.id || '')) ? String(orderData.id) : newId();
-      const secure = { ...orderData, id, timestamp: Date.now(), deliveryStatus: 'Pending' };
-      if (!await requireCustomerForPhone(req, res, cleanPhone(secure.phone))) return;
-      delete secure.paymentVerified; delete secure.razorpayPaymentId; delete secure.rzpOrderId; delete secure.serverTotal; delete secure.subtotal; delete secure.serverDeliveryFee; delete secure.paidAmount; delete secure.paidAt; delete secure.needsRefund; delete secure.duplicatePaymentId; delete secure.totalMismatch;
-      if (!secure.name || !cleanPhone(secure.phone) || cleanPhone(secure.phone).length !== 10) return res.status(400).json({ error: 'Valid customer details required.' });
-      const calc = await computeServerTotal(secure);
-      secure.serverTotal = calc.total; secure.subtotal = calc.subtotal; secure.serverDeliveryFee = calc.deliveryFee; secure.totalMismatch = Math.abs(calc.total - Number(secure.total || 0)) > 0.5;
-      if (secure.payment === 'Online') { secure.paymentVerified = false; secure.deliveryStatus = 'Payment Pending'; }
-      await db.ref(`orders/${id}`).set(secure);
-      await db.ref('admin_ring').set(true);
-      return res.status(200).json({ success: true, orderId: id, order: secure });
-    }
-
     if (!await requireAdmin(req, res)) return;
-    if (!orderId || !isValidOrderId(String(orderId))) return res.status(400).json({ error: 'Invalid order id.' });
-    if (action === 'updateStatus' && status) { await db.ref(`orders/${orderId}`).update({ deliveryStatus: String(status).slice(0, 100), updatedAt: Date.now() }); return res.status(200).json({ success: true }); }
-    if (action === 'assignBoy') { await db.ref(`orders/${orderId}`).update({ assignedBoy: String(assignedBoy || '').slice(0, 120), deliveryBoyPhone: cleanPhone(boyPhone), updatedAt: Date.now() }); return res.status(200).json({ success: true }); }
-    if (action === 'cancelOrder') { await db.ref(`orders/${orderId}`).update({ deliveryStatus: 'Cancelled', cancelledAt: Date.now() }); return res.status(200).json({ success: true }); }
-    if (action === 'deleteOrder') { await db.ref(`orders/${orderId}`).remove(); return res.status(200).json({ success: true }); }
+    if (action === 'saveBoy' && boyId && boyData && typeof boyData === 'object') { await db.ref(`deliveryBoys/${boyId}`).update(boyData); return res.status(200).json({ success: true }); }
+    if (action === 'deleteBoy' && boyId) { await db.ref(`deliveryBoys/${boyId}`).remove(); return res.status(200).json({ success: true }); }
     return res.status(400).json({ error: 'Invalid action or missing parameters' });
-  } catch (e) {
-    if (e.userFacing) return res.status(400).json({ error: e.message });
-    return safeError(res, 500, 'Order processing failed.', e);
-  }
+  } catch (e) { return safeError(res, 500, 'Delivery-partner operation failed.', e); }
 }
 
-module.exports = { ordersManager };
+// Vercel compatible router export handler
+module.exports = async function handler(req, res) {
+  const url = req.url || '';
+  if (url.includes('partners')) {
+    return deliveryPartners(req, res);
+  }
+  return deliveryAreas(req, res);
+};
