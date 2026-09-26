@@ -128,6 +128,19 @@ async function adminRefresh(req, res) {
 // ---------------------------------------------------------------------------
 // adminDb
 // GET/PUT/PATCH/DELETE ?path=<firebase/db/path>.json
+//
+// This is the endpoint the admin app's `authFetch(ADMIN_DB_PREFIX + ...)`
+// helper calls for every read/write it does (settings, categories/menu,
+// deliveryBoys, orders, deliveryBoySecrets, customerTokens, ...).
+//
+// It mirrors the shape of Firebase's own REST Database API (`<path>.json`,
+// GET/PUT/PATCH/DELETE) but requires a valid admin session token, so the app
+// never needs its own direct Firebase credentials.
+//
+// NOTE: this handler needs the raw request body (to preserve non-object JSON
+// values like a bare string/boolean/null for PUT), so whatever router you
+// wire this into must disable body parsing for this route
+// (Vercel: module.exports.config = { api: { bodyParser: false } };).
 // ---------------------------------------------------------------------------
 
 function getRawBody(req) {
@@ -139,9 +152,21 @@ function getRawBody(req) {
   });
 }
 
+// Firebase Realtime Database keys can't contain these characters.
 const FORBIDDEN_KEY_CHARS = /[.#$[\]]/;
+
+// Customer records (and their password hashes) are managed exclusively through
+// the customer handlers, which know how to hash/verify passwords correctly.
+// Block this generic proxy from touching that subtree so a bug here can never
+// write a customer's password in plain text.
 const BLOCKED_ROOTS = new Set(['customers']);
 
+// The client builds paths like "categories/Dairy%20Products/prodId/status.json"
+// (already URL-encoded once by the app for the category name) and then the
+// whole thing gets encodeURIComponent'd again to go in the query string. By the
+// time it reaches req.query.path, the outer encoding has been undone by the
+// normal query-string parser, so each path segment still needs its own
+// decodeURIComponent to recover things like spaces in category names.
 function sanitizePath(rawPath) {
   if (typeof rawPath !== 'string') return null;
   let p = rawPath.trim();
@@ -209,15 +234,8 @@ async function adminDb(req, res) {
     return safeError(res, 500, 'Database operation failed.', e);
   }
 }
+// Carried over for reference — apply wherever your router disables body
+// parsing for this handler.
+adminDb.needsRawBody = true;
 
-// Vercel compatible router export handler
-module.exports = async function handler(req, res) {
-  const url = req.url || '';
-  if (url.includes('refresh')) {
-    return adminRefresh(req, res);
-  }
-  if (url.includes('login')) {
-    return adminLogin(req, res);
-  }
-  return adminDb(req, res);
-};
+module.exports = { adminLogin, adminRefresh, adminDb };
