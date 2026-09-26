@@ -1,5 +1,13 @@
 const { db, cors, parseBody, requireAdmin, safeError } = require('../lib/common');
-const PUBLIC_KEYS = ['storeStatus','hubLat','hubLng','radiusKm','normCharge','expCharge','freeDel','upi','minOrder','minimumOrder','deliveryCharge','expressCharge'];
+// Fields the customer app is allowed to see via a public GET. Internal-only
+// admin fields (adminPushToken, orderRingAlert, ringtoneUrl) are deliberately
+// left out. Previously this list used names ('minOrder', 'minimumOrder',
+// 'deliveryCharge', 'expressCharge') that don't match anything the admin app
+// actually saves (it saves 'minOrd', 'normCharge', 'expCharge'), and left out
+// 'storeOpen', 'store', 'adminNote', 'b1'/'b2'/'b3', and 'expDeliveryTime'
+// entirely - so the store-closed banner, store name, minimum order amount,
+// promo banners and express delivery time never reached the customer app.
+const PUBLIC_KEYS = ['store','storeOpen','storeStatus','upi','hubLat','hubLng','radiusKm','normCharge','expCharge','freeDel','minOrd','expDeliveryTime','adminNote','b1','b2','b3'];
 function publicSettings(s) { const out = {}; for (const k of PUBLIC_KEYS) if (Object.prototype.hasOwnProperty.call(s,k)) out[k]=s[k]; return out; }
 module.exports = async function handler(req,res){
   cors(req,res,'GET,POST,OPTIONS'); if(req.method==='OPTIONS') return res.status(204).end();

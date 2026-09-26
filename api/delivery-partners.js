@@ -16,8 +16,27 @@ module.exports=async function(req,res){
    const pair=Object.entries(boys).find(([,b])=>String(b?.phone||'').trim()===String(phone).trim() && String(b?.secretCode||'').trim()===String(secretCode).trim());
    if(!pair) return res.status(401).json({error:'Invalid phone number or secret code'});
    const [key,boy]=pair; const {secretCode:_,...safeBoyData}=boy;
-   let token=null; try{ token=await admin.auth().createCustomToken(`delivery-${key}`,{deliveryBoy:true,boyKey:key}); }catch(e){ console.error('delivery token error',e); }
-   return res.status(200).json({success:true,boyKey:key,boy:safeBoyData,customToken:token});
+   if(!process.env.FIREBASE_WEB_API_KEY){
+    console.error('delivery-partners: FIREBASE_WEB_API_KEY env variable is missing');
+    return res.status(500).json({error:'Server is not configured yet.'});
+   }
+   // A Firebase custom token (from createCustomToken) can't be checked with
+   // verifyIdToken - it has to be exchanged for a real ID token first, the same
+   // way admin-login.js does it. Returning the raw custom token meant every
+   // delivery-boy-authenticated request (like updateBoyPushToken) would fail.
+   let idToken=null, refreshToken=null;
+   try{
+    const customToken=await admin.auth().createCustomToken(`delivery-${key}`,{deliveryBoy:true,boyKey:key});
+    const r=await fetch(
+     `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${process.env.FIREBASE_WEB_API_KEY}`,
+     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:customToken,returnSecureToken:true})}
+    );
+    const d=await r.json().catch(()=>({}));
+    if(r.ok && d.idToken){ idToken=d.idToken; refreshToken=d.refreshToken||null; }
+    else console.error('delivery-partners: token exchange failed:', r.status, JSON.stringify(d.error||d));
+   }catch(e){ console.error('delivery token error',e); }
+   if(!idToken) return res.status(500).json({error:'Login service error. Please try again.'});
+   return res.status(200).json({success:true,boyKey:key,boy:safeBoyData,idToken,refreshToken});
   }
   if(action==='updateBoyPushToken' && boyId && pushToken){
    const decoded=await requireDeliveryBoy(req,res,boyId); if(!decoded) return;
