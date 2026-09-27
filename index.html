@@ -64,15 +64,28 @@
     return [{ text: 'Try Again', onClick: startPayment }, { text: 'Back to App', href: backLink, cls: 'sec' }];
   }
 
+  function backToAppButtons() {
+    return [{ text: 'Back to App', href: backLink, cls: 'sec' }];
+  }
+
   async function startPayment() {
     if (paid || starting) return;
     starting = true;
 
     if (!ID_RE.test(orderId)) {
       starting = false;
-      return show('err', 'Invalid payment link', 'Please go back to the Manor Mart app and tap Pay Now again.', [{ text: 'Back to App', href: backLink, cls: 'sec' }]);
+      return show('err', 'Invalid payment link', 'Please go back to the Manor Mart app and tap Pay Now again.', backToAppButtons());
     }
     $('oid').textContent = '#' + orderId.slice(-6);
+
+    // No point calling the server at all without a session token: it will always
+    // be rejected as unauthenticated. This also covers older app builds that
+    // opened this page without a token.
+    if (!customerToken) {
+      starting = false;
+      return show('err', 'Please log in again', 'Your session could not be verified. Please open the Manor Mart app, log in, and tap Pay Now again.', backToAppButtons());
+    }
+
     if (typeof Razorpay === 'undefined') {
       starting = false;
       return show('err', 'Payment system not loaded', 'Please check your internet connection and try again.', retryButtons());
@@ -81,14 +94,17 @@
 
     var info;
     try {
-      var headers = { 'Content-Type': 'application/json' };
-      if (customerToken) headers['Authorization'] = 'Bearer ' + customerToken;
+      var headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + customerToken };
       var res = await fetch(API + '/create-order', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({ order_id: orderId })   // amount is NEVER sent: the server calculates it
       });
       info = await res.json().catch(function () { return {}; });
+      if (res.status === 401 || res.status === 403) {
+        starting = false;
+        return show('err', 'Please log in again', 'Your session has expired. Please open the Manor Mart app, log in, and tap Pay Now again.', backToAppButtons());
+      }
       if (!res.ok || !info.id) throw new Error(info.error || 'Could not start payment. Please try again.');
     } catch (e) {
       starting = false;
