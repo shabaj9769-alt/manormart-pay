@@ -49,7 +49,7 @@ function items(c){var o=CATS[c]||{};return Object.keys(o).filter(function(k){ret
 function render(){var names=Object.keys(CATS),h='';
  h+='<div class="box"><input id="sq" placeholder="🔍 Product khojo (sab categories me)" value="'+esc(SEARCH)+'" style="width:100%"></div>';
  h+='<div class="box"><button class="o" id="bulk" style="width:100%">📦 Bulk Import Kirana List ('+KIRANA.reduce(function(a,c){return a+c.i.length},0)+' items)</button><p class="mut">Items price 0 aur Sold status me aate hain. Price daalo, phir Stock karo.</p></div>';
- h+='<div class="box"><h3>🖼️ Auto Photos (Pexels)</h3><div class="row"><input id="pk" placeholder="Pexels API key" value="'+esc(PK)+'"><button class="o" id="ph">Photos lagao</button></div><p class="mut" id="pst">'+esc(PST||'Free key: pexels.com/api. Sirf bina photo wale items me lagegi.')+'</p></div>';
+ h+='<div class="box"><h3>🖼️ Auto Photos (Pixabay)</h3><div class="row"><input id="pk" placeholder="Pixabay key (khali = Wikimedia)" value="'+esc(PK)+'"><button class="o" id="ph">Photos lagao</button></div><p class="mut" id="pst">'+esc(PST||'Key khali chhodo to Wikimedia se photo aayegi. Sirf bina photo wale items me lagegi.')+'</p></div>';
  h+='<div class="box"><h3>📁 Nayi Category</h3><div class="row"><input id="nc" placeholder="Category naam"><input id="nci" placeholder="Image URL (optional)"><button id="addc">Add</button></div></div>';
  h+='<div class="box"><h3>🛍️ Naya Product</h3><div class="row"><select id="pc" style="padding:8px;border-radius:8px">'+names.map(function(c){return'<option>'+esc(c)+'</option>'}).join('')+'</select><input id="pn" placeholder="Naam"><input id="pp" type="number" placeholder="Price ₹"><input id="pu" placeholder="Unit (1 kg)" value="1 kg"><button id="addp">Add</button></div></div>';
  var q=SEARCH.toLowerCase();
@@ -92,18 +92,19 @@ var HI={pyaaz:'onion',aloo:'potato',tamatar:'tomato',lehsun:'garlic',adrak:'ging
 var FB=['wheat flour grains','lentils pulses','cooking oil','indian spices','tea sugar','biscuits','indian snacks namkeen','chocolate candy','milk dairy bread','fresh vegetables','dry fruits nuts','soft drink bottle','cleaning supplies','personal care soap shampoo','packaged food noodles','incense puja items'];
 function fbq(c){var i=KIRANA.findIndex(function(x){return san(x.n)===c});return i>-1?FB[i]:c}
 function qry(n){var w=n.toLowerCase().split(/[^a-z]+/).filter(function(x){return x.length>1&&['pkt','kg','ml','and','aur','ka','ki','ke'].indexOf(x)<0}),hit=false,o=w.map(function(x){if(HI[x]){hit=true;return HI[x]}return x});return hit?o.join(' '):o.join(' ')}
-function pex(key,q){return fetch('https://api.pexels.com/v1/search?per_page=1&query='+encodeURIComponent(q),{headers:{Authorization:key}}).then(function(r){if(r.status===429)throw{limit:1};if(!r.ok)throw{};return r.json()}).then(function(d){return d.photos&&d.photos[0]?d.photos[0].src.medium:''})}
+function pex(key,q){return fetch('https://pixabay.com/api/?image_type=photo&safesearch=true&per_page=3&key='+encodeURIComponent(key)+'&q='+encodeURIComponent(q.slice(0,90))).then(function(r){if(r.status===429)throw{limit:1};if(!r.ok)throw{};return r.json()}).then(function(d){return d.hits&&d.hits[0]?d.hits[0].webformatURL:''})}
+function wiki(q){return fetch('https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url|mime&iiurlwidth=400&gsrsearch='+encodeURIComponent(q+' filetype:bitmap')).then(function(r){if(r.status===429)throw{limit:1};if(!r.ok)throw{};return r.json()}).then(function(d){var p=d.query&&d.query.pages?Object.keys(d.query.pages).map(function(k){return d.query.pages[k]}).sort(function(a,b){return a.index-b.index}):[];for(var n=0;n<p.length;n++){var ii=p[n].imageinfo&&p[n].imageinfo[0];if(ii&&ii.thumburl&&/jpeg|png/.test(ii.mime))return ii.thumburl}return ''})}
 function setst(m){PST=m;var e=$('pst');if(e)e.textContent=m}
-function photos(){var key=$('pk').value.trim();if(!key)return toast('Pexels API key daalo');try{localStorage.setItem('pexkey',key)}catch(e){}PK=key;
+function photos(){var key=$('pk').value.trim();try{localStorage.setItem('pexkey',key)}catch(e){}PK=key;var src=key?function(q){return pex(key,q)}:wiki;
  var todo=[];Object.keys(CATS).forEach(function(c){items(c).forEach(function(k){if(!CATS[c][k].image)todo.push([c,k])})});
  if(!todo.length)return toast('Sab items me photo hai');
  var i=0,patch={},got=0;
  function flush(){if(!Object.keys(patch).length)return Promise.resolve();var b=patch;patch={};return fb('categories.json',{method:'PATCH',body:J(b)})}
  function step(){if(i>=todo.length)return flush().then(function(){setst('Ho gaya: '+got+' photos lagi');load()});
   var t=todo[i],p=CATS[t[0]][t[1]];setst((i+1)+'/'+todo.length+' - '+p.name);
-  return pex(key,qry(p.name)).then(function(u){return u||pex(key,fbq(t[0]))}).then(function(u){if(u){patch[t[0]+'/'+t[1]+'/image']=u;p.image=u;got++}i++;
-   return (Object.keys(patch).length>=20?flush():Promise.resolve())}).then(function(){return new Promise(function(r){setTimeout(r,350)})}).then(step)}
- step().catch(function(e){return flush().then(function(){setst(e&&e.limit?'Pexels limit poori ('+got+' photos lagi). 1 ghante baad dobara dabao, baaki wahin se chalu hoga.':'Error: internet ya key check karo ('+got+' photos lagi)');render()})})}
+  return src(qry(p.name)).then(function(u){return u||src(fbq(t[0]))}).then(function(u){if(u){patch[t[0]+'/'+t[1]+'/image']=u;p.image=u;got++}i++;
+   return (Object.keys(patch).length>=20?flush():Promise.resolve())}).then(function(){return new Promise(function(r){setTimeout(r,700)})}).then(step)}
+ step().catch(function(e){return flush().then(function(){setst(e&&e.limit?'Limit poori ('+got+' photos lagi). 1 minute ruk kar dobara dabao, baaki wahin se chalu hoga.':'Error: internet ya key check karo ('+got+' photos lagi)');render()})})}
 
 loginView();
 </script></body></html>
